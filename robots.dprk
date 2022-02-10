@@ -1,0 +1,68 @@
+package lewd_project.lewd_language.lewd_grammar;
+grammar lewd.dprk extends main_grammar.dprk;
+
+import another_file.dprk;
+import yet_another_file.dprk;
+
+
+
+program Robots {
+	messages+=Message*
+}
+
+rule Message {
+	Greeting | Direction | Alarm;
+};
+
+terminal Greeting {
+	"good morning" | "good day" | "good afternoon" | "good evening" | "good night" | "bonsoir" | "go back to sleep you little retard" | "nighty night!"
+};
+
+rule Direction {
+	
+};
+
+
+
+
+
+
+
+
+program Robots := {
+	statements+=Statement*
+};
+
+
+
+
+rule Move = {
+	Forward | Backward | Left | Right
+};
+
+rule Forward = {
+	"go" "forward" distance:Int "meters"
+};
+
+rule Backward = {
+	"go" "backward" distance:Int "meters"
+};
+
+rule Left = {
+	"go" "left" distance:Int "meters"
+};
+
+rule Right = {
+	"go" "right" distance:Int "meters"
+};
+
+
+
+
+
+
+
+
+
+
+
