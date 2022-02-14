@@ -19,6 +19,11 @@ terminal Greeting {
 	"good morning" | "good day" | "good afternoon" | "good evening" | "good night" | "bonsoir" | "go back to sleep you little retard" | "nighty night!"
 };
 
+rule Ritual {
+	"say" "out" greeting=Greeting,
+	"go" "forward" distance=Int "meters"
+};
+
 rule Direction {
 	// not yet defined
 };
@@ -36,15 +41,15 @@ rule Forward = {
 };
 
 rule Backward = {
-	"go" "backward" distance:Int "meters"
+	"go" "backward" distance=Int "meters"
 };
 
 rule Left = {
-	"go" "left" distance:Int "meters"
+	"go" "left" distance=Int "meters"
 };
 
 rule Right = {
-	"go" "right" distance:Int "meters"
+	"go" "right" distance=Int "meters"
 };
 
 

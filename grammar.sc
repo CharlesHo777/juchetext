@@ -278,7 +278,7 @@ def lexing_simp(r: Rexp, s: String) =
 
 val KEYS1 = (("grammar" | "with" | "generate") | ("program" | "import" | "as"))
 
-val KEYS2 = (("Int" | "Double") | ("String" | "Char") | ("List" | "Set"))
+val KEYS2 = (("INT" | "DOUBLE") | ("STRING" | "CHAR") | ("BOOL" | "ASCII"))
 
 val KEYS3 = (("rule" | "enumerate" | "terminal") | ("returns" | "current" | "hidden") | ("abstract" | "component"))
 
@@ -300,7 +300,7 @@ val IDENTIFIER = (LETTER ~ STAR(CHAR('_') | LETTER | NUMBER))
 
 val OPC = RANGE(Set('+', '-', '*', '/', '%', '=', '>', '<', '.', '_', ',', '\\', '!', '?', '|', '&', '~','$', '#', '^', '`', '@'))
 
-val OPS = ((RANGE(Set('+', '=', '!', '<', '>')) ~ CHAR('=')) | "&&" | "||")
+val OPS = ((RANGE(Set('+', '=', '!', '<', '>', '?')) ~ CHAR('=')) | "&&" | "||")
 
 val OP = (OPS | OPC)
 
@@ -356,7 +356,6 @@ case class T_STR(s: String) extends Token
 case class T_CHAR(c: Char) extends Token
 case class T_BRAC(c: Char) extends Token
 case class T_COLON(c: Char) extends Token
-case object T_NEWLINE extends Token
 
 
 
@@ -373,7 +372,6 @@ val token : PartialFunction[(String, String), Token] = {
 	} catch {
 		case e: Exception => T_CHAR(' ')
 	}
-	case ("space", s) if(s.contains('\n')) => T_NEWLINE
 	case ("brac", s) => T_BRAC(s.head)
 	case ("colon", s) => T_COLON(s.head)
 }
@@ -399,7 +397,7 @@ def tokenize(s: String) : List[Token] =
 // START OF PARSER
 
 
-/*
+
 
 case class ~[+A, +B](x: A, y: B)
 
@@ -467,9 +465,12 @@ case object IdParser extends Parser[List[Token], String] {
 case object TypeParser extends Parser[List[Token], String] {
 	def parse(tl: List[Token]) = {
 		if (tl != Nil) tl match {
-			case T_KEY("Int") :: ts => Set(("Int", ts))
-			case T_KEY("Double") :: ts => Set(("Double", ts))
-			case T_KEY("Void") :: ts => Set(("Void", ts))
+			case T_KEY("INT") :: ts => Set(("INT", ts))
+			case T_KEY("DOUBLE") :: ts => Set(("DOUBLE", ts))
+			case T_KEY("STRING") :: ts => Set(("STRING", ts))
+			case T_KEY("CHAR") :: ts => Set(("CHAR", ts))
+			case T_KEY("BOOL") :: ts => Set(("BOOL", ts))
+			case T_KEY("ASCII") :: ts => Set(("ASCII", ts))
 			case _ => Set()
 		}
 		else Set()
@@ -538,6 +539,21 @@ case class ColonParser(c: Char) extends Parser[List[Token], Char] {
 	}
 }
 
+case class AssignParser extends Parser[List[Token], String] {
+	def parse(tl: List[Token]) = {
+		if (tl != Nil) tl match {
+			case T_OP("+=") :: ts => Set(("+=", ts))
+			case T_OP("=") :: ts => Set(("=", ts))
+			case T_OP("?=") :: ts => Set(("?=", ts))
+			case _ => Set()
+		}
+		else Set()
+	}
+}
+
+
+
+
 
 
 // the following string interpolation allows us to write 
@@ -587,12 +603,12 @@ case class Terminal(id: String, pat: Rexp, mod: Modifier) extends Stmt
 
 
 case class Keyword(s: String) extends Exp
-case class Assign(id: String, v: Stmt, car: Cardi) extends Exp
-case class CallRule(s: Stmt) extends Exp
-case class SeqExp(e1: Exp, e2: Exp) extends Exp
+case class Assign(id: String, op: String, v: Exp) extends Exp
+case class CallRule(r: String) extends Exp
 case class AltExp(e1: Exp, e2: Exp) extends Exp
-case class RefExp(s: Stmt) extends Exp
-case class TypeExp(t: Type) extends Exp
+case class SeqExp(e1: Exp, e2: Exp) extends Exp
+case class RefExp(r: String) extends Exp
+case class TypeExp(t: String) extends Exp
 case class CardiExp(e: Exp, car: Cardi) extends Exp
 
 
@@ -621,11 +637,18 @@ case object StarCardi extends Cardi
 
 
 
-val KEYS1 = (("grammar" | "with" | "generate") | ("program" | "import" | "as"))
 
-val KEYS2 = (("Int" | "Double") | ("String" | "Char") | ("List" | "Set"))
-
-val KEYS3 = (("rule" | "enumerate" | "terminal") | ("returns" | "current" | "hidden") | ("abstract" | "component"))
+case object CardiParser extends Parser[List[Token], Cadri] {
+	def parse(tl: List[Token]) = {
+		if (tl != Nil) tl match {
+			case T_OP("*") :: ts => Set((StarCardi, ts))
+			case T_OP("+") :: ts => Set((PlusCardi, ts))
+			case T_OP("?") :: ts => Set((OptCardi, ts))
+			case _ => Set()
+		}
+		else Set()
+	}
+}
 
 
 
@@ -638,8 +661,36 @@ lazy val Stmt: Parser[List[Token], Stmt] = {
 }
 
 
+
+
+lazy val RValue: Parser[List[Token], 
+
+lazy val Exp: Parser[List[Token], Exp] = {
+	(StrParser).map[Exp]{case s => Keyword(s)} ||
+	(IdParser ~ AssignParser ~ Exp).map[Exp]{case id ~ o ~ v => Assign(id, o, v)} ||
+	(BracParser('[') ~ IdParser ~ BracParser(']')).map[Exp]{case _ ~ r ~ _ => RefExp(r)} ||
+	(IdParser).map[Exp]{case r => CallRule(r)}
+}
+
+
 lazy val Block: Parser[List[Token], List[Exp]] = {
-	
+	(AltDef ~ TKP(T_OP(",")) ~ Block).map[List[Exp]]{case al ~ _ ~ b => al :: b} ||
+	(SeqDef ~ TKP(T_OP(",")) ~ Block).map[List[Exp]]{case sq ~ _ ~ b => sq :: b} ||
+	(Exp ~ CardiParser ~ TKP(T_OP(",")) ~ Block).map[List[Exp]]{case e ~ c ~ _ ~ b => CardiExp(e, c) :: b} ||
+	(Exp ~ TKP(T_OP(",")) ~ Block).map[List[Exp]]{case e ~ _ ~ b => e :: b} ||
+	Exp
+}
+
+
+lazy val AltDef: Parser[List[Token], Exp] = {
+	(Exp ~ TKP(T_OP("|")) ~ AltDef).map[Exp]{case e ~ _ ~ al => AltExp(e, al)} ||
+	Exp
+}
+
+
+lazy val SeqDef: Parser[List[Token], Exp] = {
+	(Exp ~ SeqDef).map[Exp]{case e ~ sq => SeqExp(e, sq)} ||
+	Exp
 }
 
 
@@ -648,8 +699,12 @@ lazy val Enum: Parser[List[Token], List[Elem]] = {
 }
 
 
-lazy val Exp: Parser[List[Token], Exp] = {
+lazy val Pattern: Parser[List[Token], Rexp] = {
+	
 }
+
+
+
 
 
 
@@ -734,7 +789,7 @@ def parse_tokens(tl: List[Token]) : List[Decl] = Prog.parse_all(tl).head
 
 
 
-*/
+
 
 
 
