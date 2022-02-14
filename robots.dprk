@@ -1,13 +1,14 @@
-package lewd_project.lewd_language.lewd_grammar;
-grammar lewd.dprk extends main_grammar.dprk;
+//package lewd_project.lewd_language.lewd_grammar;
+//grammar lewd.dprk;
 
-import another_file.dprk;
-import yet_another_file.dprk;
+//import another_file.dprk;
+//import yet_another_file.dprk;
 
 
 
 program Robots {
 	messages+=Message*
+	actions+=Move*
 }
 
 rule Message {
@@ -19,22 +20,12 @@ terminal Greeting {
 };
 
 rule Direction {
-	
+	// not yet defined
 };
 
-
-
-
-
-
-
-
-program Robots := {
-	statements+=Statement*
+rule Alarm {
+	// not yet defined
 };
-
-
-
 
 rule Move = {
 	Forward | Backward | Left | Right

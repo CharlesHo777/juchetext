@@ -291,6 +291,10 @@ val KEYS3 = (("rule" | "enumerate" | "terminal") | ("returns" | "current" | "hid
 val KEYS = (KEYS3 | KEYS2 | KEYS1)
 
 
+val LETTER = RANGE((('a' to 'z') ++ ('A' to 'Z')).toSet)
+
+val NUMBER = RANGE('0' to '9')
+
 
 val IDENTIFIER = (LETTER ~ STAR(CHAR('_') | LETTER | NUMBER))
 
@@ -302,17 +306,13 @@ val OP = (OPS | OPC)
 
 
 
-val BRACKET = RANGE('(', ')', '{', '}', '[', ']')
+val BRACKET = RANGE(Set('(', ')', '{', '}', '[', ']'))
 
 val COLON = RANGE(Set(':', ';'))
 
 val Q = RANGE(Set('\"', '\''))
 
 
-
-val LETTER = RANGE((('a' to 'z') ++ ('A' to 'Z')).toSet)
-
-val NUMBER = RANGE('0' to '9')
 
 val SYMBOL = (LETTER | NUMBER | OPC | BRACKET | COLON)
 
@@ -356,6 +356,7 @@ case class T_STR(s: String) extends Token
 case class T_CHAR(c: Char) extends Token
 case class T_BRAC(c: Char) extends Token
 case class T_COLON(c: Char) extends Token
+case object T_NEWLINE extends Token
 
 
 
@@ -370,17 +371,17 @@ val token : PartialFunction[(String, String), Token] = {
 	case ("char", s) => try {
 		T_CHAR(s.filter(c => c != '\'').replace("\\", "").head)
 	} catch {
-		case e: Exception => ' '
+		case e: Exception => T_CHAR(' ')
 	}
-	case ("space", "\n") => T_NEWLINE
-	case ("brac", c) => T_BRAC(c)
-	case ("colon", c) => T_COLON(c)
+	case ("space", s) if(s.contains('\n')) => T_NEWLINE
+	case ("brac", s) => T_BRAC(s.head)
+	case ("colon", s) => T_COLON(s.head)
 }
 
 
 // by using collect we filter out all unwanted tokens
 def tokenize(s: String) : List[Token] = 
-  lexing_simp(FUN_REGS, s).collect(token)
+  lexing_simp(GRAMMAR_LANG, s).collect(token)
 
 
 
@@ -398,7 +399,7 @@ def tokenize(s: String) : List[Token] =
 // START OF PARSER
 
 
-
+/*
 
 case class ~[+A, +B](x: A, y: B)
 
@@ -630,9 +631,9 @@ val KEYS3 = (("rule" | "enumerate" | "terminal") | ("returns" | "current" | "hid
 
 
 lazy val Stmt: Parser[List[Token], Stmt] = {
-	(TKP(T_KEY("rule")) ~ IdParser ~ BracParser('{') ~ Block ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ _ ~ es ~ _ ~ _ => Rule(id, es)} |
-	(TKP(T_KEY("enumerate")) ~ IdParser ~ BracParser('{') ~ Enum ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ _ ~ en ~ _ ~ _ => Enumerate(id, en)} |
-	(TKP(T_KEY("terminal")) ~ IdParser ~ BracParser('{') ~ Enum ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ _ ~ }
+	(TKP(T_KEY("rule")) ~ IdParser ~ Mod ~ BracParser('{') ~ Block ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ es ~ _ ~ _ => Rule(id, es, m)} |
+	(TKP(T_KEY("enumerate")) ~ IdParser ~ Mod ~ BracParser('{') ~ Enum ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ en ~ _ ~ _ => Enumerate(id, en, m)} |
+	(TKP(T_KEY("terminal")) ~ IdParser ~ Mod ~ BracParser('{') ~ Enum ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ en ~ _ ~ _ => Terminal(id, en, m) }
 	(TKP(T_KEY("program")) ~ IdParser ~ BracParser('{') ~ Block ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ _ ~ es ~ _ ~ _ => Program(id, es)}
 }
 
@@ -733,7 +734,7 @@ def parse_tokens(tl: List[Token]) : List[Decl] = Prog.parse_all(tl).head
 
 
 
-
+*/
 
 
 
