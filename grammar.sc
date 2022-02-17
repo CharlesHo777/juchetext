@@ -330,6 +330,8 @@ val COMMENT = ("//" ~ STAR(SYMBOL | RANGE(Set(' ', '\"', '\'', '\t', '\r', '\"',
 val CHARACTER = (CHAR('\'') ~ (SYMBOL | RANGE(Set(' ', '\n', '\t', '\r')) | ("\\\"" | "\\\'" | "\\\n" | "\\\t" | "\\\r")) ~ CHAR('\''))
 
 
+
+
 val GRAMMAR_LANG =	STAR(("key" $ KEYS) |
                  		("id" $ IDENTIFIER) |
  										("op" $ OP) |
@@ -585,15 +587,12 @@ implicit def ParserOps[I : IsSeq, T](p: Parser[I, T]) = new {
 abstract class Elem
 abstract class Exp
 abstract class Stmt
-abstract class Head
 
 
 case class Modifier(returns: Rule, hidden: List[Type], component: Boolean)
 
 
-case class Grammar(g: String, w: String) extends Head
-case class Generate(n: String, uri: String) extends Head
-case class Import(uri: String, as: String) extends Head
+case class Heading(kwd: String, p1: String, p2: String) extends Stmt
 
 
 case class Program(id: String, exps: List[Exp]) extends Stmt
@@ -654,15 +653,23 @@ case object CardiParser extends Parser[List[Token], Cadri] {
 
 
 lazy val Stmt: Parser[List[Token], Stmt] = {
-	(TKP(T_KEY("rule")) ~ IdParser ~ Mod ~ BracParser('{') ~ Block ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ es ~ _ ~ _ => Rule(id, es, m)} |
-	(TKP(T_KEY("enumerate")) ~ IdParser ~ Mod ~ BracParser('{') ~ Enum ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ en ~ _ ~ _ => Enumerate(id, en, m)} |
-	(TKP(T_KEY("terminal")) ~ IdParser ~ Mod ~ BracParser('{') ~ Enum ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ en ~ _ ~ _ => Terminal(id, en, m) }
-	(TKP(T_KEY("program")) ~ IdParser ~ BracParser('{') ~ Block ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ _ ~ es ~ _ ~ _ => Program(id, es)}
+	(TKP(T_KEY("rule")) ~ IdParser ~ Mod ~ BracParser('{') ~ Block ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ es ~ _ ~ _ => Rule(id, es, m)} ||
+	(TKP(T_KEY("enumerate")) ~ IdParser ~ Mod ~ BracParser('{') ~ Enum ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ en ~ _ ~ _ => Enumerate(id, en, m)} ||
+	(TKP(T_KEY("terminal")) ~ IdParser ~ Mod ~ BracParser('{') ~ Enum ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ en ~ _ ~ _ => Terminal(id, en, m) } ||
+	(TKP(T_KEY("program")) ~ IdParser ~ BracParser('{') ~ Block ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ _ ~ es ~ _ ~ _ => Program(id, es)} ||
+	Head
 }
 
 
+lazy val Head: Parser[List[Token], Stmt] = {
+	(TKP(T_KEY("grammar")) ~ Path ~ ColonParser(';'))
+}
 
 
+lazy val Path: Parser[List[Token], String] = {
+	(IdParser ~ TKP(T_OP(".")) ~ Path).map[String]{case id ~ _ ~ ps => id ++ ps} ||
+	IdParser.map[String]{a => a}
+}
 
 
 lazy val Exp: Parser[List[Token], Exp] = {
@@ -678,7 +685,7 @@ lazy val Block: Parser[List[Token], List[Exp]] = {
 	(SeqDef ~ TKP(T_OP(",")) ~ Block).map[List[Exp]]{case sq ~ _ ~ b => sq :: b} ||
 	(Exp ~ CardiParser ~ TKP(T_OP(",")) ~ Block).map[List[Exp]]{case e ~ c ~ _ ~ b => CardiExp(e, c) :: b} ||
 	(Exp ~ TKP(T_OP(",")) ~ Block).map[List[Exp]]{case e ~ _ ~ b => e :: b} ||
-	Exp
+	Exp.map[List[Exp]]{a => List(a)}
 }
 
 
@@ -695,30 +702,14 @@ lazy val SeqDef: Parser[List[Token], Exp] = {
 
 
 lazy val Enum: Parser[List[Token], List[Elem]] = {
-	
+	(Exp ~ TKP(T_OP("|")) ~ Enum).map[List[Elem]]{case e ~ _ ~ en => e :: en} ||
+	Exp.map[List[Elem]]{e => List(e)}
 }
 
 
 lazy val Pattern: Parser[List[Token], Rexp] = {
 	
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -745,23 +736,9 @@ lazy val Factor: Parser[List[Token], Exp] = {
    IdParser.map(Var) || IntParser.map(Num) || DoubleParser.map(FNum) ||
    CharParser.map(ChConst)
 }
+
+
    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
