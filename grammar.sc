@@ -589,8 +589,6 @@ abstract class Exp
 abstract class Stmt
 
 
-case class Modifier(returns: Rule, hidden: List[Type], component: Boolean)
-
 
 case class Heading(kwd: String, p1: String, p2: String) extends Stmt
 
@@ -628,13 +626,19 @@ case class TerminalType(t: Terminal) extends Type
 
 
 
+case class Modifier(component: Boolean, returns: String, hidden: List[String])
+
+def ModP1(m: Modifier) : Boolean = m match {case Modifier(b, _, _) => b ; case _ => false}
+def ModP2(m: Modifier) : String = m match {case Modifier(_, s, _) => s ; case _ => ""}
+def ModP3(m: Modifier) : List[String] = m match {case Modifier(_, _, sl) => sl ; case _ => Nil}
+
+
+
 
 abstract class Cardi
 case object OptCardi extends Cardi
 case object PlusCardi extends Cardi
 case object StarCardi extends Cardi
-
-
 
 
 case object CardiParser extends Parser[List[Token], Cadri] {
@@ -653,11 +657,28 @@ case object CardiParser extends Parser[List[Token], Cadri] {
 
 
 lazy val Stmt: Parser[List[Token], Stmt] = {
-	(TKP(T_KEY("rule")) ~ IdParser ~ Mod ~ BracParser('{') ~ Block ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ es ~ _ ~ _ => Rule(id, es, m)} ||
-	(TKP(T_KEY("enumerate")) ~ IdParser ~ Mod ~ BracParser('{') ~ Enum ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ en ~ _ ~ _ => Enumerate(id, en, m)} ||
-	(TKP(T_KEY("terminal")) ~ IdParser ~ Mod ~ BracParser('{') ~ Enum ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ en ~ _ ~ _ => Terminal(id, en, m) } ||
+	(TKP(T_KEY("rule")) ~ IdParser ~ Mod ~ Block ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ es ~ _ ~ _ => Rule(id, es, m)} ||
+	(TKP(T_KEY("enumerate")) ~ IdParser ~ Mod ~ Enum ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ en ~ _ ~ _ => Enumerate(id, en, m)} ||
+	(TKP(T_KEY("terminal")) ~ IdParser ~ Mod ~ Enum ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ en ~ _ ~ _ => Terminal(id, en, m) } ||
 	(TKP(T_KEY("program")) ~ IdParser ~ BracParser('{') ~ Block ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ _ ~ es ~ _ ~ _ => Program(id, es)} ||
 	Head
+}
+
+
+
+
+lazy val Mod: Parser[List[Token], Modifier] = {
+	def 
+	(TKP(T_KEY("component")) ~ Mod).map[Modifier]{case _ ~ ms => Modifier(true, ModP2(ms), ModP3(ms))} ||
+	(TKP(T_KEY("returns")) ~ IdParser ~ Mod).map[Modifier]{case _ ~ id ~ ms => Modifier(ModP1(ms), id, ModP3(ms))} ||
+	(TKP(T_KEY("hidden")) ~ BracParser('(') ~ Hiddens ~ BracParser(')') ~ Mod).map[Modifier]{case _ ~ _ ~ hs ~ _ ~ ms => Modifier(ModP1(ms), ModP2(ms), hs)} ||
+	(BracParser('{')).map[Modifier]{_ => Modifier(false, "", Nil)}
+}
+
+
+lazy val Hiddens: Parser[List[Token], List[String]] = {
+	(IdParser ~ TKP(T_OP(",")) ~ Hiddens).map{case h ~ _ ~ hs => h :: hs} ||
+	(IdParser).map{h => List(h)}
 }
 
 
@@ -702,16 +723,14 @@ lazy val SeqDef: Parser[List[Token], Exp] = {
 
 
 lazy val Enum: Parser[List[Token], List[Elem]] = {
-	(Exp ~ TKP(T_OP("|")) ~ Enum).map[List[Elem]]{case e ~ _ ~ en => e :: en} ||
-	Exp.map[List[Elem]]{e => List(e)}
+	(Exp ~ TKP(T_OP("|")) ~ Enum).map{case e ~ _ ~ en => e :: en} ||
+	Exp.map{e => List(e)}
 }
 
 
-lazy val Pattern: Parser[List[Token], Rexp] = {
-	
-}
 
 
+// lazy val Pattern: Parser[List[Token], Rexp] = {}
 
 
 
@@ -738,17 +757,15 @@ lazy val Factor: Parser[List[Token], Exp] = {
 }
 
 
-   
 
 
-
-lazy val Prog: Parser[List[Token], List[Decl]] = {
-	(Decl ~ ColonParser(";")) ~ Prog).map{case d ~ _ ~ p => d :: p} ||
-	Decl.map{d => List(d)}
+lazy val Grammar: Parser[List[Token], List[Stmt]] = {
+	(Stmt ~ Grammar).map{case s ~ g => s :: g} ||
+	Stmt.map{s => List(s)}
 }
 
 
- 
+
 
 def lex(code: String) : List[Token] = tokenize(code)
 
