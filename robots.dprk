@@ -1,3 +1,5 @@
+val g1 = {
+
 //package lewd_project.lewd_language.lewd_grammar;
 //grammar lewd.dprk;
 
@@ -52,7 +54,7 @@ rule Right = {
 	"go" "right" distance=Int "meters"
 };
 
-
+}
 
 
 

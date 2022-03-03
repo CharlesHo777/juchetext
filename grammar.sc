@@ -541,7 +541,7 @@ case class ColonParser(c: Char) extends Parser[List[Token], Char] {
 	}
 }
 
-case class AssignParser extends Parser[List[Token], String] {
+case object AssignParser extends Parser[List[Token], String] {
 	def parse(tl: List[Token]) = {
 		if (tl != Nil) tl match {
 			case T_OP("+=") :: ts => Set(("+=", ts))
@@ -641,7 +641,7 @@ case object PlusCardi extends Cardi
 case object StarCardi extends Cardi
 
 
-case object CardiParser extends Parser[List[Token], Cadri] {
+case object CardiParser extends Parser[List[Token], Cardi] {
 	def parse(tl: List[Token]) = {
 		if (tl != Nil) tl match {
 			case T_OP("*") :: ts => Set((StarCardi, ts))
@@ -654,12 +654,13 @@ case object CardiParser extends Parser[List[Token], Cadri] {
 }
 
 
+// case class Terminal and its parser are currently stubs
 
 
 lazy val Stmt: Parser[List[Token], Stmt] = {
-	(TKP(T_KEY("rule")) ~ IdParser ~ Mod ~ Block ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ es ~ _ ~ _ => Rule(id, es, m)} ||
-	(TKP(T_KEY("enumerate")) ~ IdParser ~ Mod ~ Enum ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ en ~ _ ~ _ => Enumerate(id, en, m)} ||
-	(TKP(T_KEY("terminal")) ~ IdParser ~ Mod ~ Enum ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ _ ~ en ~ _ ~ _ => Terminal(id, en, m) } ||
+	(TKP(T_KEY("rule")) ~ IdParser ~ Mod ~ Block ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ es ~ _ ~ _ => Rule(id, es, m)} ||
+	(TKP(T_KEY("enumerate")) ~ IdParser ~ Mod ~ Enum ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ en ~ _ ~ _ => Enumerate(id, en, m)} ||
+	(TKP(T_KEY("terminal")) ~ IdParser ~ Mod ~ Enum ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ m ~ en ~ _ ~ _ => Terminal(id, ONE, m) } ||
 	(TKP(T_KEY("program")) ~ IdParser ~ BracParser('{') ~ Block ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{case _ ~ id ~ _ ~ es ~ _ ~ _ => Program(id, es)} ||
 	Head
 }
@@ -668,7 +669,6 @@ lazy val Stmt: Parser[List[Token], Stmt] = {
 
 
 lazy val Mod: Parser[List[Token], Modifier] = {
-	def 
 	(TKP(T_KEY("component")) ~ Mod).map[Modifier]{case _ ~ ms => Modifier(true, ModP2(ms), ModP3(ms))} ||
 	(TKP(T_KEY("returns")) ~ IdParser ~ Mod).map[Modifier]{case _ ~ id ~ ms => Modifier(ModP1(ms), id, ModP3(ms))} ||
 	(TKP(T_KEY("hidden")) ~ BracParser('(') ~ Hiddens ~ BracParser(')') ~ Mod).map[Modifier]{case _ ~ _ ~ hs ~ _ ~ ms => Modifier(ModP1(ms), ModP2(ms), hs)} ||
@@ -683,7 +683,11 @@ lazy val Hiddens: Parser[List[Token], List[String]] = {
 
 
 lazy val Head: Parser[List[Token], Stmt] = {
-	(TKP(T_KEY("grammar")) ~ Path ~ ColonParser(';'))
+	(TKP(T_KEY("grammar")) ~ Path ~ ColonParser(';')).map[Stmt]{case _ ~ p1 ~ _ => Heading("grammar", p1, "")} ||
+	(TKP(T_KEY("grammar")) ~ Path ~ TKP(T_KEY("with")) ~ Path ~ ColonParser(';')).map[Stmt]{case _ ~ p1 ~ _ ~ p2 ~ _ => Heading("grammar", p1, p2)} ||
+	(TKP(T_KEY("generate")) ~ IdParser ~ StrParser ~ ColonParser(';')).map[Stmt]{case _ ~ o ~ s ~ _ => Heading("generate", o, s)} ||
+	(TKP(T_KEY("import")) ~ StrParser ~ ColonParser(';')).map[Stmt]{case _ ~ s ~ _ => Heading("import", s, "")} ||
+	(TKP(T_KEY("import")) ~ StrParser ~ TKP(T_KEY("as")) ~ IdParser ~ ColonParser(';')).map[Stmt]{case _ ~ s ~ _ ~ id ~ _ => Heading("import", s, id)}
 }
 
 
@@ -734,6 +738,8 @@ lazy val Enum: Parser[List[Token], List[Elem]] = {
 
 
 
+/*
+
 
 // arithmetic expressions
 lazy val AExp: Parser[List[Token], Exp] = {
@@ -750,11 +756,13 @@ lazy val Term: Parser[List[Token], Exp] = {
 } 
   
 lazy val Factor: Parser[List[Token], Exp] = {
-   (TKP(T_LPAREN("(")) ~ AExp ~ TKP(T_RPAREN(")"))).map{ case _ ~ y ~ _ => y } ||
+   (BracParser('(') ~ AExp ~ BracParser(')')).map{ case _ ~ y ~ _ => y } ||
    CallParser.map[Exp]{c => c} ||
    IdParser.map(Var) || IntParser.map(Num) || DoubleParser.map(FNum) ||
    CharParser.map(ChConst)
 }
+
+*/
 
 
 
@@ -769,9 +777,9 @@ lazy val Grammar: Parser[List[Token], List[Stmt]] = {
 
 def lex(code: String) : List[Token] = tokenize(code)
 
-def parse(code: String) : List[Decl] = Prog.parse_all(tokenize(code)).head
+def parse(code: String) : List[Stmt] = Grammar.parse_all(tokenize(code)).head
 
-def parse_tokens(tl: List[Token]) : List[Decl] = Prog.parse_all(tl).head
+def parse_tokens(tl: List[Token]) : List[Stmt] = Grammar.parse_all(tl).head
 
 
 
