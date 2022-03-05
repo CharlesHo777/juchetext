@@ -1,20 +1,17 @@
-val g1 = {
 
-//package lewd_project.lewd_language.lewd_grammar;
-//grammar lewd.dprk;
+grammar lewd.dprk;
 
-//import another_file.dprk;
-//import yet_another_file.dprk;
+import "phuc";
 
 
 
 program Robots {
-	messages+=Message*
-	actions+=Move*
-}
+	messages+=(Message)*,
+	actions+=(Move)*
+};
 
 rule Message {
-	Greeting | Direction | Alarm;
+	Greeting | Direction | Alarm
 };
 
 terminal Greeting {
@@ -26,38 +23,25 @@ rule Ritual {
 	"go" "forward" distance=Int "meters"
 };
 
-rule Direction {
-	// not yet defined
-};
-
-rule Alarm {
-	// not yet defined
-};
-
-rule Move = {
+rule Move {
 	Forward | Backward | Left | Right
 };
 
-rule Forward = {
-	"go" "forward" distance:Int "meters"
+rule Forward {
+	"go" "forward" distance=Int "meters"
 };
 
-rule Backward = {
+rule Backward {
 	"go" "backward" distance=Int "meters"
 };
 
-rule Left = {
+rule Left {
 	"go" "left" distance=Int "meters"
 };
 
-rule Right = {
+rule Right {
 	"go" "right" distance=Int "meters"
 };
-
-}
-
-
-
 
 
 

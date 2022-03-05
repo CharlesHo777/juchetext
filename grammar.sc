@@ -1,3 +1,5 @@
+
+
 /*
 	This .sc file contains a parser for the grammar file containing the
 	syntax definition of a user-defined programming language. The output
@@ -5,7 +7,6 @@
 	processed with the ultimate goal of generating a lexical analyzer and
 	a parser for the aforementioned programming language.
 */
-
 
 
 
@@ -278,7 +279,9 @@ def lexing_simp(r: Rexp, s: String) =
 
 val KEYS1 = (("grammar" | "with" | "generate") | ("program" | "import" | "as"))
 
-val KEYS2 = (("INT" | "DOUBLE") | ("STRING" | "CHAR") | ("BOOL" | "ASCII"))
+val KEYS2 = ("INT" | "DOUBLE" |"STRING")
+
+// KEYS2 may also have CHAR, BOOLEAN, ASCII
 
 val KEYS3 = (("rule" | "enumerate" | "terminal") | ("returns" | "current" | "hidden") | ("abstract" | "component"))
 
@@ -387,11 +390,6 @@ def tokenize(s: String) : List[Token] =
 
 
 // END OF LEXER
-
-
-
-
-//
 
 
 
@@ -606,13 +604,15 @@ case class AltExp(e1: Exp, e2: Exp) extends Exp
 case class SeqExp(e1: Exp, e2: Exp) extends Exp
 case class RefExp(r: String) extends Exp
 case class TypeExp(t: String) extends Exp
-case class CardiExp(e: Exp, car: Cardi) extends Exp
+case class CardiExp(e: Exp, c: Cardi) extends Exp
+case class Action(i: String) extends Exp
 
 
-case class IElem(n: Int) extends Elem
-case class DElem(d: Double) extends Elem
-case class CElem(c: Char) extends Elem
-case class SElem(s: String) extends Elem
+
+// case class IElem(n: String, v: Int) extends Elem
+// case class DElem(n: String, v: Double) extends Elem
+// case class CElem(n: String, v: Char) extends Elem
+case class SElem(n: String, v: String) extends Elem
 
 
 
@@ -667,7 +667,6 @@ lazy val Stmt: Parser[List[Token], Stmt] = {
 
 
 
-
 lazy val Mod: Parser[List[Token], Modifier] = {
 	(TKP(T_KEY("component")) ~ Mod).map[Modifier]{case _ ~ ms => Modifier(true, ModP2(ms), ModP3(ms))} ||
 	(TKP(T_KEY("returns")) ~ IdParser ~ Mod).map[Modifier]{case _ ~ id ~ ms => Modifier(ModP1(ms), id, ModP3(ms))} ||
@@ -700,17 +699,23 @@ lazy val Path: Parser[List[Token], String] = {
 lazy val Exp: Parser[List[Token], Exp] = {
 	(StrParser).map[Exp]{case s => Keyword(s)} ||
 	(IdParser ~ AssignParser ~ Exp).map[Exp]{case id ~ o ~ v => Assign(id, o, v)} ||
+  (IdParser).map[Exp]{case r => CallRule(r)} ||
+  (BracParser('(') ~ Exp ~ BracParser(')') ~ CardiParser).map[Exp]{case _ ~ e ~ _ ~ c => CardiExp(e, c)} ||
 	(BracParser('[') ~ IdParser ~ BracParser(']')).map[Exp]{case _ ~ r ~ _ => RefExp(r)} ||
-	(IdParser).map[Exp]{case r => CallRule(r)}
+  (BracParser('(') ~ Exp ~ BracParser(')')).map[Exp]{case _ ~ e ~ _ => e}
 }
 
 
 lazy val Block: Parser[List[Token], List[Exp]] = {
-	(AltDef ~ TKP(T_OP(",")) ~ Block).map[List[Exp]]{case al ~ _ ~ b => al :: b} ||
-	(SeqDef ~ TKP(T_OP(",")) ~ Block).map[List[Exp]]{case sq ~ _ ~ b => sq :: b} ||
-	(Exp ~ CardiParser ~ TKP(T_OP(",")) ~ Block).map[List[Exp]]{case e ~ c ~ _ ~ b => CardiExp(e, c) :: b} ||
-	(Exp ~ TKP(T_OP(",")) ~ Block).map[List[Exp]]{case e ~ _ ~ b => e :: b} ||
-	Exp.map[List[Exp]]{a => List(a)}
+	(Line ~ TKP(T_OP(",")) ~ Block).map[List[Exp]]{case l ~ _ ~ b => l :: b} ||
+	Line.map[List[Exp]]{l => List(l)}
+}
+
+
+lazy val Line: Parser[List[Token], Exp] = {
+  (AltDef).map[Exp]{al => al} ||
+  (SeqDef).map[Exp]{sq => sq} ||
+  Exp
 }
 
 
@@ -727,19 +732,23 @@ lazy val SeqDef: Parser[List[Token], Exp] = {
 
 
 lazy val Enum: Parser[List[Token], List[Elem]] = {
-	(Exp ~ TKP(T_OP("|")) ~ Enum).map{case e ~ _ ~ en => e :: en} ||
-	Exp.map{e => List(e)}
+	(Elem ~ TKP(T_OP("|")) ~ Enum).map{case e ~ _ ~ en => e :: en} ||
+	Elem.map{e => List(e)}
 }
 
+
+lazy val Elem: Parser[List[Token], Elem] = {
+  (IdParser ~ TKP(T_OP("=")) ~ StrParser).map[Elem]{case i ~ _ ~ v => SElem(i, v)} ||
+  (StrParser).map[Elem]{s => SElem(s, s)} ||
+  (IdParser).map[Elem]{i => SElem(i, i)}
+}
 
 
 
 // lazy val Pattern: Parser[List[Token], Rexp] = {}
 
 
-
 /*
-
 
 // arithmetic expressions
 lazy val AExp: Parser[List[Token], Exp] = {
@@ -766,12 +775,10 @@ lazy val Factor: Parser[List[Token], Exp] = {
 
 
 
-
 lazy val Grammar: Parser[List[Token], List[Stmt]] = {
 	(Stmt ~ Grammar).map{case s ~ g => s :: g} ||
 	Stmt.map{s => List(s)}
 }
-
 
 
 
@@ -789,15 +796,13 @@ def parse_tokens(tl: List[Token]) : List[Stmt] = Grammar.parse_all(tl).head
 
 
 
+/*
 
+Consider additional functionalities:
+1. Terminal rules with regular expressions
+2. Actions
 
-
-
-
-
-
-
-
+*/
 
 
 
