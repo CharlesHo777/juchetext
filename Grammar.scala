@@ -9,6 +9,10 @@
 */
 
 
+package jucheparse
+
+
+object Grammar {
 
 
 // START OF LEXER
@@ -198,6 +202,7 @@ def inj(r: Rexp, c: Char, v: Val) : Val = (r, v) match {
   case (NTIMES(reg, n), _) => Exact(inj(reg, c, v) :: Nil, 1)
   
   case (RECD(x, r1), _) => Rec(x, inj(r1, c, v))
+  case _ => Empty
 }
 
 // lexing functions without simplification
@@ -286,9 +291,9 @@ val KEYS2 = ("INT" | "DOUBLE" |"STRING")
 val KEYS3 = (("rule" | "enumerate" | "terminal") | ("returns" | "current" | "hidden") | ("abstract" | "component"))
 
 
-// val KEYS4 = 
+// val KEYS4 = ONE
 
-// val KEYS5 = 
+// val KEYS5 = ONE
 
 
 val KEYS = (KEYS3 | KEYS2 | KEYS1)
@@ -576,16 +581,12 @@ implicit def ParserOps[I : IsSeq, T](p: Parser[I, T]) = new {
 
 
 
-
-
-
 // the abstract syntax trees for the grammar language
 
 
 abstract class Elem
 abstract class Exp
 abstract class Stmt
-
 
 
 case class Heading(kwd: String, p1: String, p2: String) extends Stmt
@@ -608,13 +609,10 @@ case class CardiExp(e: Exp, c: Cardi) extends Exp
 case class Action(i: String) extends Exp
 
 
-
 // case class IElem(n: String, v: Int) extends Elem
 // case class DElem(n: String, v: Double) extends Elem
 // case class CElem(n: String, v: Char) extends Elem
 case class SElem(n: String, v: String) extends Elem
-
-
 
 
 abstract class Type
@@ -625,6 +623,11 @@ case object CharType extends Type
 case class TerminalType(t: Terminal) extends Type
 
 
+abstract class Cardi
+case object OptCardi extends Cardi
+case object PlusCardi extends Cardi
+case object StarCardi extends Cardi
+
 
 case class Modifier(component: Boolean, returns: String, hidden: List[String])
 
@@ -632,13 +635,6 @@ def ModP1(m: Modifier) : Boolean = m match {case Modifier(b, _, _) => b ; case _
 def ModP2(m: Modifier) : String = m match {case Modifier(_, s, _) => s ; case _ => ""}
 def ModP3(m: Modifier) : List[String] = m match {case Modifier(_, _, sl) => sl ; case _ => Nil}
 
-
-
-
-abstract class Cardi
-case object OptCardi extends Cardi
-case object PlusCardi extends Cardi
-case object StarCardi extends Cardi
 
 
 case object CardiParser extends Parser[List[Token], Cardi] {
@@ -803,6 +799,9 @@ Consider additional functionalities:
 2. Actions
 
 */
+
+
+}
 
 
 

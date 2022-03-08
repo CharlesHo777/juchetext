@@ -1,5 +1,12 @@
 
 
+package juchetext
+
+
+object ParserTemplate {
+
+
+val code = """
 
 case class ~[+A, +B](x: A, y: B)
 
@@ -174,7 +181,13 @@ implicit def ParserOps[I : IsSeq, T](p: Parser[I, T]) = new {
   def map[S](f: => T => S) = new MapParser[I, T, S](p, f)
 }
 
+"""
 
+
+def get : String = code
+
+
+}
 
 
 
