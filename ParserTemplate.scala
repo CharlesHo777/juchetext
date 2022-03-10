@@ -1,6 +1,6 @@
 
 
-package juchetext
+package jucheparser
 
 
 object ParserTemplate {

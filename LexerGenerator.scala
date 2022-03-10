@@ -1,21 +1,31 @@
 
 
-package juchetext
+package jucheparser
 
 
 class LexerGenerator {
 
+	def traverse_exp(e: Grammar.Exp) : List[String] = e match {
+		case _ => Nil
+	}
+
+	def traverse_exps(el: List[Grammar.Exp]) : List[String] = el match {
+		case e :: es => traverse_exp(e) :: traverse_exps(es)
+		case Nil => Nil
+	}
+
+	def traverse_stmt(s: Grammar.Stmt) : List[String] = s match {
+		case Program(_, el) => traverse_exps(el)
+		case Rule(_, el, _) => traverse_exps(el)
+		case Enumerate(_, sl, _) => sl.map(s => s match {case SElem(_, v) => v ; case _ => ""})
+		case Terminal(_, _, _) => Nil
+		case _ => Nil
+	}
+
+	/*
 
 	abstract class Elem
 	abstract class Exp
-	abstract class Stmt
-
-	case class Heading(kwd: String, p1: String, p2: String) extends Stmt
-
-	case class Program(id: String, exps: List[Exp]) extends Stmt
-	case class Rule(id: String, exps: List[Exp], mod: Modifier) extends Stmt
-	case class Enumerate(id: String, el: List[Elem], mod: Modifier) extends Stmt
-	case class Terminal(id: String, pat: Rexp, mod: Modifier) extends Stmt
 
 	case class Keyword(s: String) extends Exp
 	case class Assign(id: String, op: String, v: Exp) extends Exp
@@ -27,34 +37,20 @@ class LexerGenerator {
 	case class CardiExp(e: Exp, c: Cardi) extends Exp
 	case class Action(i: String) extends Exp
 
-	// case class IElem(n: String, v: Int) extends Elem
-	// case class DElem(n: String, v: Double) extends Elem
-	// case class CElem(n: String, v: Char) extends Elem
-	case class SElem(n: String, v: String) extends Elem
-
-	abstract class Type
-	case object IntType extends Type
-	case object DoubleType extends Type
-	case object StringType extends Type
-	case object CharType extends Type
-	case class TerminalType(t: Terminal) extends Type
-
-	abstract class Cardi
-	case object OptCardi extends Cardi
-	case object PlusCardi extends Cardi
-	case object StarCardi extends Cardi
-
 	case class Modifier(component: Boolean, returns: String, hidden: List[String])
 
+	*/
+	
 	
 	val template = LexerTemplate.get
 
 
-	def generate(ls: List[Stmt]) : String = {
+	def generate(ls: List[Grammar.Stmt]) : String = {
 
 		s"""
 		
 		"""
+
 	}
 
 }
