@@ -206,9 +206,6 @@ case object TypeParser extends Parser[List[Token], String] {
 			case T_KEY("INT") :: ts => Set(("INT", ts))
 			case T_KEY("DOUBLE") :: ts => Set(("DOUBLE", ts))
 			case T_KEY("STRING") :: ts => Set(("STRING", ts))
-			case T_KEY("CHAR") :: ts => Set(("CHAR", ts))
-			case T_KEY("BOOL") :: ts => Set(("BOOL", ts))
-			case T_KEY("ASCII") :: ts => Set(("ASCII", ts))
 			case _ => Set()
 		}
 		else Set()

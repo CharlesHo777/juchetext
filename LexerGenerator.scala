@@ -5,7 +5,18 @@ package jucheparser
 
 class LexerGenerator {
 
+
+
 	def traverse_exp(e: Grammar.Exp) : List[String] = e match {
+		case Keyword(s) => List(s)
+		case Assign(_, _, v) => traverse_exp(v)
+		case CallRule(_) => Nil
+		case AltExp(e1, e2) => traverse_exp(e1) ::: traverse_exp(e2)
+		case SeqExp(e1, e2) => traverse_exp(e1) ::: traverse_exp(e2)
+		case RefExp(_) => Nil
+		case TypeExp(_) => Nil
+		case CardiExp(e, _) => traverse_exp(e)
+		case Action(_) => Nil
 		case _ => Nil
 	}
 
@@ -22,25 +33,9 @@ class LexerGenerator {
 		case _ => Nil
 	}
 
-	/*
 
-	abstract class Elem
-	abstract class Exp
-
-	case class Keyword(s: String) extends Exp
-	case class Assign(id: String, op: String, v: Exp) extends Exp
-	case class CallRule(r: String) extends Exp
-	case class AltExp(e1: Exp, e2: Exp) extends Exp
-	case class SeqExp(e1: Exp, e2: Exp) extends Exp
-	case class RefExp(r: String) extends Exp
-	case class TypeExp(t: String) extends Exp
-	case class CardiExp(e: Exp, c: Cardi) extends Exp
-	case class Action(i: String) extends Exp
-
-	case class Modifier(component: Boolean, returns: String, hidden: List[String])
-
-	*/
-	
+	// case class Modifier(component: Boolean, returns: String, hidden: List[String])
+		
 	
 	val template = LexerTemplate.get
 
