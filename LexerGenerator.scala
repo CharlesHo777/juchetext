@@ -1,6 +1,6 @@
 
 
-package jucheparser
+package jucheparse
 
 
 class LexerGenerator {

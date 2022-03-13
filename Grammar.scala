@@ -9,7 +9,7 @@
 */
 
 
-package jucheparser
+package jucheparse
 
 
 object Grammar {

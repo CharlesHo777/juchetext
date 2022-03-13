@@ -1,6 +1,6 @@
 
 
-// package jucheparser
+// package jucheparse
 
 
 // regular expressions including records
@@ -17,7 +17,10 @@ case class RANGE(s: Set[Char]) extends Rexp
 case class PLUS(r: Rexp) extends Rexp
 case class OPT(r: Rexp) extends Rexp
 case class NTIMES(r: Rexp, n: Int) extends Rexp
+
 case class CHARSEQ(cl: List[Char]) extends Rexp
+case class ALTL(rl: List[Rexp]) extends Rexp
+case object ANY extends Rexp
 
 // records for extracting strings or tokens
 case class RECD(x: String, r: Rexp) extends Rexp
@@ -46,7 +49,11 @@ case class Ranged(c: Char) extends Val
 case class More(v: Val, vs: Stars) extends Val
 case class Opted(v: Val) extends Val
 case class Exact(vs: List[Val], n: Int) extends Val
+
 case class ChrSq(cl: List[Char]) extends Val
+case class Choice(v: Val, i: Int, l: Int) extends Val
+case class AnyChar(c: Char) extends Val
+
 
 // some convenience for typing in regular expressions
 
@@ -87,7 +94,14 @@ def nullable(r: Rexp) : Boolean = r match {
 	case PLUS(reg) => nullable(reg)
 	case OPT(reg) => true
 	case NTIMES(reg, n) => if (n == 0) true else nullable(reg)
-	case CHARSEQ(cl) => if (cl.size == 0) true else false
+
+	case CHARSEQ(cl) => false
+	case ALTL(rl) => {
+		if (rl.isEmpty) false
+		else if (rl.exists(x => nullable(x))) true
+		else false
+	}
+	case ANY => false
 	
 	case RECD(_, r1) => nullable(r1)
 }
@@ -111,11 +125,17 @@ def der(c: Char, r: Rexp) : Rexp = r match {
 		else if (n == 1) der(c, reg)
 		else SEQ(der(c, reg), NTIMES(reg, n - 1))
 	}
+
 	case CHARSEQ(cl) => cl match {
 		case Nil => ZERO
-		// case e :: Nil => der(c, CHAR(e))
+		case e :: Nil => der(c, CHAR(e))
 		case e :: es => if (e == c) CHARSEQ(es) else ZERO
 	}
+	case ALTL(rl) => rl match {
+		case Nil => ZERO
+		case xx => ALTL(xx.map(x => der(c, x)))
+	}
+	case ANY => ONE
 		
 	case RECD(_, r1) => der(c, r1)
 }
@@ -125,18 +145,23 @@ def flatten(v: Val) : String = v match {
 
 	case Empty => ""
 	case Chr(c) => c.toString
-	case Left(v) => flatten(v)
-	case Right(v) => flatten(v)
+	case Left(vx) => flatten(vx)
+	case Right(vx) => flatten(vx)
 	case Sequ(v1, v2) => flatten(v1) ++ flatten(v2)
 	case Stars(vs) => vs.map(flatten).mkString 
 	
 	case Ranged(c) => c.toString
-	case More(v, stars) => flatten(v) ++ flatten(stars)
-	case Opted(v) => flatten(v)
+	case More(vx, stars) => flatten(vx) ++ flatten(stars)
+	case Opted(vx) => flatten(vx)
 	case Exact(vs, n) => vs.map(flatten).mkString
+
 	case ChrSq(cl) => cl.mkString
+	case Choice(vx, i, l) => flatten(vx)
+	case AnyChar(c) => c.toString
 	
 	case Rec(_, v) => flatten(v)
+
+	case _ => ""
 }
 
 // extracts an environment from a value;
@@ -145,18 +170,21 @@ def env(v: Val) : List[(String, String)] = v match {
 
 	case Empty => Nil
 	case Chr(c) => Nil
-	case Left(v) => env(v)
-	case Right(v) => env(v)
+	case Left(vx) => env(vx)
+	case Right(vx) => env(vx)
 	case Sequ(v1, v2) => env(v1) ::: env(v2)
 	case Stars(vs) => vs.flatMap(env)
 	
 	case Ranged(c) => Nil
-	case More(v, stars) => env(v) ::: env(stars)
-	case Opted(v) => env(v)
+	case More(vx, stars) => env(vx) ::: env(stars)
+	case Opted(vx) => env(vx)
 	case Exact(vs, n) => vs.flatMap(env)
+
 	case ChrSq(cl) => Nil
-	
-	case Rec(x, v) => (x, flatten(v))::env(v)
+	case Choice(vx, i, l) => env(vx)
+	case AnyChar(c) => Nil
+
+	case Rec(x, vx) => (x, flatten(vx))::env(vx)
 
 	case _ => Nil
 }
@@ -172,7 +200,7 @@ def mkeps(r: Rexp) : Val = r match {
 	case SEQ(r1, r2) => Sequ(mkeps(r1), mkeps(r2))
 	case STAR(reg) => Stars(Nil)
 	
-	case RANGE(_) => throw new Exception("RANGE is not nullable.")
+	case RANGE(_) => throw new Exception("The reg exp RANGE is not nullable.")
 	case PLUS(reg) => More(mkeps(reg), Stars(Nil))
 	case OPT(reg) => Opted(Empty)
 	case NTIMES(reg, n) => {
@@ -180,10 +208,19 @@ def mkeps(r: Rexp) : Val = r match {
 		else if (n > 0) Exact(List.fill(n)(Empty), n)
 		else throw new Exception("In NTIMES(r, n), n cannot be smaller than 0.")
 	}
-	case CHARSEQ(cl) => {
-		if (cl.size == 0) ChrSq(Nil)
-		else throw new Exception("In CHARSEQ, the cl : List[Char] is not an empty list.")
+
+	case CHARSEQ(cl) => throw new Exception("By definition, the reg exp CHARSEQ is not nullable.")
+	case ALTL(rl) => rl match {
+		case Nil => throw new Exception("mkeps() error, Rexp not nullable")
+		case xx => {
+			val rx = xx.find(x => nullable(x)).getOrElse(ONE)
+			val i = xx.indexOf(rx)
+			if (i != -1) Choice(Empty, i, xx.size)
+			else throw new Exception("mkeps() error, Rexp not nullable")
+		}
 	}
+	case ANY => throw new Exception("The reg exp ANY is not nullable.")
+
 	case RECD(x, reg) => Rec(x, mkeps(reg))
 	case _ => throw new Exception("mkeps() error, Rexp not nullable")
 }
@@ -204,8 +241,12 @@ def inj(r: Rexp, c: Char, v: Val) : Val = (r, v) match {
 		if (m == n - 1) Exact(inj(reg, c, v1) :: l, m + 1)
 		else throw new Exception("The injection process involving NTIMES and Exact is faulty.")
 	case (NTIMES(reg, n), _) => Exact(inj(reg, c, v) :: Nil, 1)
-	case (CHARSEQ(lr), ChrSq(lv)) => ChrSq(c :: lv)
-	
+
+	case (CHARSEQ(lr), Empty) => ChrSq(List(c))
+	case (CHARSEQ(lr), ChrSq(lv)) if (! lv.isEmpty) => ChrSq(c :: lv)
+	case (ALTL(lr), Choice(vx, i, l)) => Choice(inj(lr.applyOrElse(i, (nu: Int) => ZERO), c, vx), i, l)
+	case (ANY, Empty) => AnyChar(c)
+
 	case (RECD(x, r1), _) => Rec(x, inj(r1, c, v))
 
 	case _ => NotMatched
@@ -220,8 +261,7 @@ def lex(r: Rexp, s: List[Char]) : Val = s match {
 
 def value(r: Rexp, s: String) : Val = lex(r, s.toList)
 
-def lexing(r: Rexp, s: String) = 
-	env(lex(r, s.toList))
+def lexing(r: Rexp, s: String) = env(lex(r, s.toList))
 
 // Rectification functions
 

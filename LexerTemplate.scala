@@ -1,7 +1,7 @@
 
 
 
-package jucheparser
+package jucheparse
 
 
 object LexerTemplate {

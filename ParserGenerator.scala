@@ -1,4 +1,4 @@
-package jucheparser
+package jucheparse
 
 
 class ParserGenerator {
