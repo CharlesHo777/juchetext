@@ -18,21 +18,10 @@ object Grammar {
 // START OF LEXER
 
 
-val KEYS1 = (("grammar" | "with" | "generate") | ("program" | "import" | "as"))
-
-val KEYS2 = ("INT" | "DOUBLE" |"STRING")
-
-// KEYS2 may also have CHAR, BOOLEAN, ASCII
-
-val KEYS3 = (("rule" | "enumerate" | "terminal") | ("returns" | "current" | "hidden") | ("abstract" | "component"))
+// KEYS may also have CHAR, BOOLEAN, ASCII
 
 
-// val KEYS4 = ONE
-
-// val KEYS5 = ONE
-
-
-val KEYS = (KEYS3 | KEYS2 | KEYS1)
+val KEYS = ALTL(List[Rexp]("rule", "enumerate", "terminal", "returns", "current", "hidden", "abstract", "component", "ID", "INT", "DOUBLE", "STRING", "grammar", "with", "generate", "program", "import", "as"))
 
 
 val LETTER = RANGE((('a' to 'z') ++ ('A' to 'Z')).toSet)
@@ -46,21 +35,19 @@ val OPC = RANGE(Set('+', '-', '*', '/', '%', '=', '>', '<', '.', '_', ',', '\\',
 
 val OPS = ((RANGE(Set('+', '=', '!', '<', '>', '?')) ~ CHAR('=')) | "&&" | "||")
 
-val OP = (OPS | OPC)
-
+val OP = (OPS / OPC)
 
 
 val BRACKET = RANGE(Set('(', ')', '{', '}', '[', ']'))
 
 val COLON = RANGE(Set(':', ';'))
 
-val Q = RANGE(Set('\"', '\''))
+val QUOTE = RANGE(Set('\"', '\''))
 
 
+val SYMBOL = ALTL(List(LETTER, NUMBER, OPC, BRACKET, COLON))
 
-val SYMBOL = (LETTER | NUMBER | OPC | BRACKET | COLON)
-
-val INT = (OPT(CHAR('-')) ~ (CHAR('0') | (RANGE('1' to '9') ~ NUMBER.%)))
+val INT = (OPT(CHAR('-')) ~ (CHAR('0') / (RANGE('1' to '9') ~ NUMBER.%)))
 
 val DOUBLE = (INT ~ CHAR('.') ~ (PLUS(NUMBER)))
 
@@ -69,28 +56,28 @@ val WHITESPACE = PLUS(RANGE(Set(' ', '\n', '\t', '\r')))
 
 val STRING = (CHAR('\"') ~ (SYMBOL | WHITESPACE | "\\\"" | "\\\'").% ~ CHAR('\"'))
 
-val COMMENT = ("//" ~ STAR(SYMBOL | RANGE(Set(' ', '\"', '\'', '\t', '\r', '\"', '\''))) ~ "\n")
+val COMMENT = ("//" ~ STAR(SYMBOL / RANGE(Set(' ', '\"', '\'', '\t', '\r', '\"', '\''))) ~ "\n")
 
-val CHARACTER = (CHAR('\'') ~ (SYMBOL | RANGE(Set(' ', '\n', '\t', '\r')) | ("\\\"" | "\\\'" | "\\\n" | "\\\t" | "\\\r")) ~ CHAR('\''))
-
-
+val CHARACTER = (CHAR('\'') ~ (SYMBOL | RANGE(Set(' ', '\n', '\t', '\r')) | ALTL(List[Rexp]("\\\"", "\\\'", "\\\n", "\\\t", "\\\r"))) ~ CHAR('\''))
 
 
-val GRAMMAR_LANG =	STAR(("key" $ KEYS) |
-                 		("id" $ IDENTIFIER) |
- 										("op" $ OP) |
-	                  ("int" $ INT) |
-  	                ("db" $ DOUBLE) |
-  	                ("str" $ STRING) |
-  	                ("char" $ CHARACTER) |
-  	                ("space" $ WHITESPACE) |
-  	                ("brac" $ BRACKET) |
-  	                ("colon" $ COLON) |
-  	                ("com" $ COMMENT))
-
-
-
-abstract class Token 
+val GRAMMAR_LANG = {
+	STAR(
+		ALTL(List[Rexp](
+			("key" $ KEYS),
+ 			("id" $ IDENTIFIER),
+ 			("op" $ OP),
+	   	("int" $ INT),
+      ("db" $ DOUBLE),
+      ("str" $ STRING),
+      ("char" $ CHARACTER),
+      ("space" $ WHITESPACE),
+      ("brac" $ BRACKET),
+      ("colon" $ COLON),
+      ("com" $ COMMENT)
+		)) 
+	)
+}
 
 
 case class T_KEY(s: String) extends Token
@@ -102,7 +89,6 @@ case class T_STR(s: String) extends Token
 case class T_CHAR(c: Char) extends Token
 case class T_BRAC(c: Char) extends Token
 case class T_COLON(c: Char) extends Token
-
 
 
 
@@ -203,6 +189,7 @@ case object IdParser extends Parser[List[Token], String] {
 case object TypeParser extends Parser[List[Token], String] {
 	def parse(tl: List[Token]) = {
 		if (tl != Nil) tl match {
+			case T_KEY("ID") :: ts => Set(("ID", ts))
 			case T_KEY("INT") :: ts => Set(("INT", ts))
 			case T_KEY("DOUBLE") :: ts => Set(("DOUBLE", ts))
 			case T_KEY("STRING") :: ts => Set(("STRING", ts))
@@ -425,6 +412,7 @@ lazy val Exp: Parser[List[Token], Exp] = {
   (IdParser).map[Exp]{case r => CallRule(r)} ||
   (BracParser('(') ~ Exp ~ BracParser(')') ~ CardiParser).map[Exp]{case _ ~ e ~ _ ~ c => CardiExp(e, c)} ||
 	(BracParser('[') ~ IdParser ~ BracParser(']')).map[Exp]{case _ ~ r ~ _ => RefExp(r)} ||
+	(TypeParser).map[Exp]{case t => TypeExp(t)} ||
   (BracParser('(') ~ Exp ~ BracParser(')')).map[Exp]{case _ ~ e ~ _ => e}
 }
 

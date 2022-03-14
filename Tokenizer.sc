@@ -55,6 +55,10 @@ case class Choice(v: Val, i: Int, l: Int) extends Val
 case class AnyChar(c: Char) extends Val
 
 
+
+abstract class Token 
+
+
 // some convenience for typing in regular expressions
 
 def charlist2rexp(s : List[Char]): Rexp = s match {
@@ -68,17 +72,35 @@ implicit def string2rexp(s : String) : Rexp = {
 }
 
 implicit def RexpOps(r: Rexp) = new {
-	def | (s: Rexp) = ALT(r, s)
+	def | (s: Rexp) = (r, s) match {
+		case (ALTL(al), ALTL(bl)) => ALTL(al ::: bl)
+		case (p, ALTL(ps)) => ALTL(p :: ps)
+		case (ALTL(pa), p) => ALTL(pa ::: List[Rexp](p))
+		case (p1, p2) => ALTL(List[Rexp](p1, p2))
+	}
+	def / (s: Rexp) = ALT(r, s)
 	def % = STAR(r)
 	def ~ (s: Rexp) = SEQ(r, s)
 }
 
 implicit def stringOps(s: String) = new {
-	def | (r: Rexp) = ALT(s, r)
-	def | (r: String) = ALT(s, r)
+
+	def | (r: Rexp) = (s, r) match {
+		case (p, ALTL(ps)) => ALTL(p :: ps)
+		case (p1, p2) => ALTL(List[Rexp](p1, p2))
+	}
+	/*
+	def | (r: String) = (s, r) match {
+		case (ALTL(al), ALTL(bl)) => ALTL(al ::: bl)
+		case (p, ALTL(ps)) => ALTL(p :: ps)
+		case (ALTL(pa), p) => ALTL(pa :: List[Rexp](p))
+		case (p1, p2) => ALTL(List[Rexp](p1, p2))
+	}*/
+	def / (r: Rexp) = ALT(s, r)
+	def / (r: String) = ALT(s, r)
 	def % = STAR(s)
 	def ~ (r: Rexp) = SEQ(s, r)
-	def ~ (r: String) = CHARSEQ(s.toList ::: r.toList)
+	def ~ (r: String) = SEQ(s, r)
 	def $ (r: Rexp) = RECD(s, r)
 }
 
@@ -115,7 +137,7 @@ def der(c: Char, r: Rexp) : Rexp = r match {
 	case SEQ(r1, r2) => 
 		if (nullable(r1)) ALT(SEQ(der(c, r1), r2), der(c, r2))
 		else SEQ(der(c, r1), r2)
-	case STAR(r) => SEQ(der(c, r), STAR(r))
+	case STAR(rx) => SEQ(der(c, rx), STAR(rx))
 	
 	case RANGE(charSet) => if (charSet.contains(c)) ONE else ZERO
 	case PLUS(reg) => SEQ(der(c, reg), STAR(reg))
@@ -133,6 +155,7 @@ def der(c: Char, r: Rexp) : Rexp = r match {
 	}
 	case ALTL(rl) => rl match {
 		case Nil => ZERO
+		// case p :: Nil => der(c, p)
 		case xx => ALTL(xx.map(x => der(c, x)))
 	}
 	case ANY => ONE
