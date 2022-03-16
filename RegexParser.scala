@@ -33,7 +33,7 @@ val WHITESPACE = PLUS(RANGE(Set(' ', '\n', '\t', '\r')))
 
 val ESCAPED = (
 	(CHAR('\\') ~ (BRACKET | SPECIAL)) |
-	ALTL(List[Rexp]("\\\\", "\\ ", "\\\n", "\\\t", "\\\r"))
+	ALTL(List[Rexp]("\\\\", "\\ ", "\\n", "\\t", "\\r"))
 )
 
 val REGEX = STAR(
@@ -77,7 +77,6 @@ val token : PartialFunction[(String, String), Token] = {
 		case e: Exception => T_ERROR
 	}
 }
-
 
 
 
