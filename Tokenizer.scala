@@ -1,6 +1,6 @@
 
 
-// package jucheparse
+package jucheparse
 
 
 // regular expressions including records
@@ -19,7 +19,6 @@ case class OPT(r: Rexp) extends Rexp
 case class NTIMES(r: Rexp, n: Int) extends Rexp
 
 case class CHARSEQ(cl: List[Char]) extends Rexp
-case class ALTL(rl: List[Rexp]) extends Rexp
 case object ANY extends Rexp
 
 // records for extracting strings or tokens
@@ -51,7 +50,6 @@ case class Opted(v: Val) extends Val
 case class Exact(vs: List[Val], n: Int) extends Val
 
 case class ChrSq(cl: List[Char]) extends Val
-case class Choice(v: Val, i: Int, l: Int) extends Val
 case class AnyChar(c: Char) extends Val
 
 
@@ -72,32 +70,16 @@ implicit def string2rexp(s : String) : Rexp = {
 }
 
 implicit def RexpOps(r: Rexp) = new {
-	def | (s: Rexp) = (r, s) match {
-		case (ALTL(al), ALTL(bl)) => ALTL(al ::: bl)
-		case (p, ALTL(ps)) => ALTL(p :: ps)
-		case (ALTL(pa), p) => ALTL(pa ::: List[Rexp](p))
-		case (p1, p2) => ALTL(List[Rexp](p1, p2))
-	}
-	def / (s: Rexp) = ALT(r, s)
+
+	def | (s: Rexp) = ALT(r, s)
 	def % = STAR(r)
 	def ~ (s: Rexp) = SEQ(r, s)
 }
 
 implicit def stringOps(s: String) = new {
 
-	def | (r: Rexp) = (s, r) match {
-		case (p, ALTL(ps)) => ALTL(p :: ps)
-		case (p1, p2) => ALTL(List[Rexp](p1, p2))
-	}
-	/*
-	def | (r: String) = (s, r) match {
-		case (ALTL(al), ALTL(bl)) => ALTL(al ::: bl)
-		case (p, ALTL(ps)) => ALTL(p :: ps)
-		case (ALTL(pa), p) => ALTL(pa :: List[Rexp](p))
-		case (p1, p2) => ALTL(List[Rexp](p1, p2))
-	}*/
-	def / (r: Rexp) = ALT(s, r)
-	def / (r: String) = ALT(s, r)
+	def | (r: Rexp) = ALT(s, r)
+	def | (r: String) = ALT(s, r)
 	def % = STAR(s)
 	def ~ (r: Rexp) = SEQ(s, r)
 	def ~ (r: String) = SEQ(s, r)
@@ -118,11 +100,7 @@ def nullable(r: Rexp) : Boolean = r match {
 	case NTIMES(reg, n) => if (n == 0) true else nullable(reg)
 
 	case CHARSEQ(cl) => false
-	case ALTL(rl) => {
-		if (rl.isEmpty) false
-		else if (rl.exists(x => nullable(x))) true
-		else false
-	}
+
 	case ANY => false
 	
 	case RECD(_, r1) => nullable(r1)
@@ -153,11 +131,7 @@ def der(c: Char, r: Rexp) : Rexp = r match {
 		case e :: Nil => der(c, CHAR(e))
 		case e :: es => if (e == c) CHARSEQ(es) else ZERO
 	}
-	case ALTL(rl) => rl match {
-		case Nil => ZERO
-		// case p :: Nil => der(c, p)
-		case xx => ALTL(xx.map(x => der(c, x)))
-	}
+
 	case ANY => ONE
 		
 	case RECD(_, r1) => der(c, r1)
@@ -179,7 +153,6 @@ def flatten(v: Val) : String = v match {
 	case Exact(vs, n) => vs.map(flatten).mkString
 
 	case ChrSq(cl) => cl.mkString
-	case Choice(vx, i, l) => flatten(vx)
 	case AnyChar(c) => c.toString
 	
 	case Rec(_, v) => flatten(v)
@@ -204,7 +177,6 @@ def env(v: Val) : List[(String, String)] = v match {
 	case Exact(vs, n) => vs.flatMap(env)
 
 	case ChrSq(cl) => Nil
-	case Choice(vx, i, l) => env(vx)
 	case AnyChar(c) => Nil
 
 	case Rec(x, vx) => (x, flatten(vx))::env(vx)
@@ -233,15 +205,7 @@ def mkeps(r: Rexp) : Val = r match {
 	}
 
 	case CHARSEQ(cl) => throw new Exception("By definition, the reg exp CHARSEQ is not nullable.")
-	case ALTL(rl) => rl match {
-		case Nil => throw new Exception("mkeps() error, Rexp not nullable")
-		case xx => {
-			val rx = xx.find(x => nullable(x)).getOrElse(ONE)
-			val i = xx.indexOf(rx)
-			if (i != -1) Choice(Empty, i, xx.size)
-			else throw new Exception("mkeps() error, Rexp not nullable")
-		}
-	}
+
 	case ANY => throw new Exception("The reg exp ANY is not nullable.")
 
 	case RECD(x, reg) => Rec(x, mkeps(reg))
@@ -267,7 +231,6 @@ def inj(r: Rexp, c: Char, v: Val) : Val = (r, v) match {
 
 	case (CHARSEQ(lr), Empty) => ChrSq(List(c))
 	case (CHARSEQ(lr), ChrSq(lv)) if (! lv.isEmpty) => ChrSq(c :: lv)
-	case (ALTL(lr), Choice(vx, i, l)) => Choice(inj(lr.applyOrElse(i, (nu: Int) => ZERO), c, vx), i, l)
 	case (ANY, Empty) => AnyChar(c)
 
 	case (RECD(x, r1), _) => Rec(x, inj(r1, c, v))
@@ -276,6 +239,8 @@ def inj(r: Rexp, c: Char, v: Val) : Val = (r, v) match {
 }
 
 // lexing functions without simplification
+/*
+
 def lex(r: Rexp, s: List[Char]) : Val = s match {
 	case Nil => if (nullable(r)) mkeps(r) else 
 		{ throw new Exception("lexing error") } 
@@ -285,6 +250,8 @@ def lex(r: Rexp, s: List[Char]) : Val = s match {
 def value(r: Rexp, s: String) : Val = lex(r, s.toList)
 
 def lexing(r: Rexp, s: String) = env(lex(r, s.toList))
+
+*/
 
 // Rectification functions
 
@@ -361,6 +328,7 @@ def lex_simp(r: Rexp, s: List[Char]) : Val = s match {
 		inj(r, c, f_simp(lex_simp(r_simp, cs)))
 	}
 }
+
 
 def lex(r: Rexp, s: String) = 
 	env(lex_simp(r, s.toList))

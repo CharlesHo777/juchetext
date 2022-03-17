@@ -1,8 +1,5 @@
 
 
-package jucheparse
-
-
 // regular expressions including records
 abstract class Rexp
 
@@ -42,6 +39,9 @@ case class Ranged(c: Char) extends Val
 case class More(v: Val, vs: Stars) extends Val
 case class Opted(v: Val) extends Val
 case class Exact(vs: List[Val], n: Int) extends Val
+
+
+abstract class Token
 
 // some convenience for typing in regular expressions
 
@@ -260,6 +260,99 @@ def lex_simp(r: Rexp, s: List[Char]) : Val = s match {
 
 def lex(r: Rexp, s: String) = 
 	env(lex_simp(r, s.toList))
+
+
+
+
+val KEYS = ("rule" | "enumerate" | "terminal" | "returns" | "current" | "hidden" | "abstract" | "component" | "ID" | "INT" | "DOUBLE" | "STRING" | "grammar" | "with" | "generate" | "program" | "import" | "as")
+
+
+val LETTER = RANGE((('a' to 'z') ++ ('A' to 'Z')).toSet)
+
+val NUMBER = RANGE('0' to '9')
+
+
+val IDENTIFIER = (LETTER ~ STAR(CHAR('_') | LETTER | NUMBER))
+
+val OPC = RANGE(Set('+', '-', '*', '/', '%', '=', '>', '<', '.', '_', ',', '\\', '!', '?', '|', '&', '~','$', '#', '^', '`', '@'))
+
+val OPS = ((RANGE(Set('+', '=', '!', '<', '>', '?')) ~ CHAR('=')) | "&&" | "||")
+
+val OP = (OPS | OPC)
+
+
+val BRACKET = RANGE(Set('(', ')', '{', '}', '[', ']'))
+
+val COLON = RANGE(Set(':', ';'))
+
+val QUOTE = RANGE(Set('\"', '\''))
+
+
+val SYMBOL = (LETTER | NUMBER | OPC | BRACKET | COLON)
+
+val INT = (OPT(CHAR('-')) ~ (CHAR('0') | (RANGE('1' to '9') ~ NUMBER.%)))
+
+val DOUBLE = (INT ~ CHAR('.') ~ (PLUS(NUMBER)))
+
+
+val WHITESPACE = PLUS(RANGE(Set(' ', '\n', '\t', '\r')))
+
+val STRING = (CHAR('\"') ~ (SYMBOL | WHITESPACE | "\\\"" | "\\\'").% ~ CHAR('\"'))
+
+val COMMENT = ("//" ~ STAR(SYMBOL | RANGE(Set(' ', '\"', '\'', '\t', '\r', '\"', '\''))) ~ "\n")
+
+val CHARACTER = (CHAR('\'') ~ (SYMBOL | RANGE(Set(' ', '\n', '\t', '\r')) | ("\\\\" | "\\\"" | "\\\'" | "\\n" | "\\t" | "\\r")) ~ CHAR('\''))
+
+
+val GRAMMAR_LANG = {
+	STAR(
+		("key" $ KEYS) |
+		("id" $ IDENTIFIER) |
+		("op" $ OP) |
+		("int" $ INT) |
+		("db" $ DOUBLE) |
+		("str" $ STRING) |
+		("char" $ CHARACTER) |
+		("space" $ WHITESPACE) |
+		("brac" $ BRACKET) |
+		("colon" $ COLON) |
+		("com" $ COMMENT)
+	)
+}
+
+
+case class T_KEY(s: String) extends Token
+case class T_ID(s: String) extends Token
+case class T_OP(s: String) extends Token
+case class T_INT(n: Int) extends Token
+case class T_DB(d: Double) extends Token
+case class T_STR(s: String) extends Token
+case class T_CHAR(c: Char) extends Token
+case class T_BRAC(c: Char) extends Token
+case class T_COLON(c: Char) extends Token
+
+
+
+val token : PartialFunction[(String, String), Token] = {
+	case ("key", s) => T_KEY(s)
+	case ("id", s) => T_ID(s)
+	case ("op", s) => T_OP(s)
+	case ("int", s) => T_INT(s.toInt)
+	case ("db", s) => T_DB(s.toDouble)
+	case ("str", s) => T_STR(s.filter(c => c != '\"'))
+	case ("char", s) => try {
+		T_CHAR(s.filter(c => c != '\'').replace("\\", "").head)
+	} catch {
+		case e: Exception => T_CHAR(' ')
+	}
+	case ("brac", s) => T_BRAC(s.head)
+	case ("colon", s) => T_COLON(s.head)
+}
+
+
+// by using collect we filter out all unwanted tokens
+def tokenize(s: String) : List[Token] = 
+  lex(GRAMMAR_LANG, s).collect(token)
 
 
 
