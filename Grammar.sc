@@ -21,6 +21,8 @@ case object ANY extends Rexp
 // records for extracting strings or tokens
 case class RECD(x: String, r: Rexp) extends Rexp
 
+/* def RANGE takes a parameter of type collection.immutable.NumericRange[Char],
+the output value is of type Rexp and is equivalent to case class RANGE */
 def RANGE(range: collection.immutable.NumericRange[Char]): Rexp = {
 	RANGE(range.toSet)
 }
@@ -49,7 +51,9 @@ case class Choice(v: Val, i: Int, l: Int) extends Val
 case class AnyChar(c: Char) extends Val
 
 
+
 abstract class Token 
+
 
 // some convenience for typing in regular expressions
 
@@ -81,6 +85,13 @@ implicit def stringOps(s: String) = new {
 		case (p, ALTL(ps)) => ALTL(p :: ps)
 		case (p1, p2) => ALTL(List[Rexp](p1, p2))
 	}
+	/*
+	def | (r: String) = (s, r) match {
+		case (ALTL(al), ALTL(bl)) => ALTL(al ::: bl)
+		case (p, ALTL(ps)) => ALTL(p :: ps)
+		case (ALTL(pa), p) => ALTL(pa :: List[Rexp](p))
+		case (p1, p2) => ALTL(List[Rexp](p1, p2))
+	}*/
 	def / (r: Rexp) = ALT(s, r)
 	def / (r: String) = ALT(s, r)
 	def % = STAR(s)
@@ -140,7 +151,6 @@ def der(c: Char, r: Rexp) : Rexp = r match {
 	}
 	case ALTL(rl) => rl match {
 		case Nil => ZERO
-		// case p :: Nil => der(c, p)
 		case xx => ALTL(xx.map(x => der(c, x)))
 	}
 	case ANY => ONE
@@ -223,7 +233,7 @@ def mkeps(r: Rexp) : Val = r match {
 		case xx => {
 			val rx = xx.find(x => nullable(x)).getOrElse(ONE)
 			val i = xx.indexOf(rx)
-			if (i != -1) Choice(Empty, i, xx.size)
+			if (i != -1) Choice(mkeps(rx), i, xx.size)
 			else throw new Exception("mkeps() error, Rexp not nullable")
 		}
 	}
@@ -261,6 +271,8 @@ def inj(r: Rexp, c: Char, v: Val) : Val = (r, v) match {
 }
 
 // lexing functions without simplification
+/*
+
 def lex(r: Rexp, s: List[Char]) : Val = s match {
 	case Nil => if (nullable(r)) mkeps(r) else 
 		{ throw new Exception("lexing error") } 
@@ -270,6 +282,8 @@ def lex(r: Rexp, s: List[Char]) : Val = s match {
 def value(r: Rexp, s: String) : Val = lex(r, s.toList)
 
 def lexing(r: Rexp, s: String) = env(lex(r, s.toList))
+
+*/
 
 // Rectification functions
 
@@ -290,10 +304,19 @@ def F_ALT(f1: Val => Val, f2: Val => Val) = (v:Val) => v match {
 	case Left(v) => Left(f1(v))
 	case _ => NotMatched
 }
+
+def F_ALTL(fl: List[Val => Val]) = (v:Val) => v match {
+	case Choice(vi, i, l) => {
+		Choice(fl.applyOrElse(i, (nu: Int) => ((u: Val) => u))(vi), i, l)
+	}
+	case _ => NotMatched
+}
+
 def F_SEQ(f1: Val => Val, f2: Val => Val) = (v:Val) => v match {
 	case Sequ(v1, v2) => Sequ(f1(v1), f2(v2))
 	case _ => NotMatched
 }
+
 def F_SEQ_Empty1(f1: Val => Val, f2: Val => Val) = {
 	(v:Val) => if (v == NotMatched) v
 		else Sequ(f1(Empty), f2(v))
@@ -329,6 +352,10 @@ def simp(r: Rexp): (Rexp, Val => Val) = r match {
 			case _ => (SEQ(r1s,r2s), F_SEQ(f1s, f2s))
 		}
 	}
+	case ALTL(rl) => {
+		val tuple_list = rl.map(simp)
+		(ALTL(tuple_list.map(t => t._1)), F_ALTL(tuple_list.map(t => t._2)))
+	}
 	case r => (r, F_ID)
 }
 
@@ -349,7 +376,6 @@ def lex_simp(r: Rexp, s: List[Char]) : Val = s match {
 
 def lex(r: Rexp, s: String) = 
 	env(lex_simp(r, s.toList))
-
 
 
 
@@ -502,7 +528,7 @@ class SeqParser[I : IsSeq, T, S](p: => Parser[I, T],
          (hd2, tl2) <- q.parse(tl1)) yield (new ~(hd1, hd2), tl2)
 }*/
 
-class SeqParser[I : IsSeq](pl: List[Parser[I, Any]]) extends Parser[I, List[Any]] {
+class SeqParser[I : IsSeq](pl: => List[Parser[I, Any]]) extends Parser[I, List[Any]] {
 	implicit def listToAny(s: Set[(List[Any], I)]) : Set[(Any, I)] = s.map(tp => (tp._1.asInstanceOf[Any], tp._2))
 
 	def prepend(p: Parser[I, Any]) = new SeqParser[I](p :: pl)
@@ -867,7 +893,6 @@ lazy val Grammar: Parser[List[Token], List[Stmt]] = {
 }
 
 
-def lex(code: String) : List[Token] = tokenize(code)
 
 def parse(code: String) : List[Stmt] = Grammar.parse_all(tokenize(code)).head.asInstanceOf[List[Stmt]]
 
