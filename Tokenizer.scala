@@ -20,6 +20,8 @@ case class NTIMES(r: Rexp, n: Int) extends Rexp
 
 case class CHARSEQ(cl: List[Char]) extends Rexp
 case object ANY extends Rexp
+case class BOUND(r: Rexp, min: Int, max: Int) extends Rexp
+case class NOT(c: Char) extends Rexp
 
 // records for extracting strings or tokens
 case class RECD(x: String, r: Rexp) extends Rexp
@@ -51,6 +53,8 @@ case class Exact(vs: List[Val], n: Int) extends Val
 
 case class ChrSq(cl: List[Char]) extends Val
 case class AnyChar(c: Char) extends Val
+case class Bounded(vs: List[Val], n: Int) extends Val
+case class Nein(c: Char) extends Val
 
 
 
@@ -97,11 +101,20 @@ def nullable(r: Rexp) : Boolean = r match {
 	case RANGE(_) => false
 	case PLUS(reg) => nullable(reg)
 	case OPT(reg) => true
-	case NTIMES(reg, n) => if (n == 0) true else nullable(reg)
+	case NTIMES(reg, n) => {
+		if (n == 0) true
+		else if (n < 0) false
+		else nullable(reg)
+	}
 
 	case CHARSEQ(cl) => false
-
 	case ANY => false
+	case BOUND(reg, min, max) => {
+		if (min == 0 && max >= min) true
+		else if (min < 0 && max >= 0) true
+		else false
+	}
+	case NOT(_) => false
 	
 	case RECD(_, r1) => nullable(r1)
 }
@@ -131,9 +144,18 @@ def der(c: Char, r: Rexp) : Rexp = r match {
 		case e :: Nil => der(c, CHAR(e))
 		case e :: es => if (e == c) CHARSEQ(es) else ZERO
 	}
-
 	case ANY => ONE
-		
+	case BOUND(r, min, max) => {
+		if (min > 0 && max >= min)
+			SEQ(der(c, r), BOUND(r, min - 1, max - 1))
+		else if (min == 0 && max > min)
+			SEQ(der(c, r), BOUND(r, min, max - 1)
+		else if (min < 0 && max > 0)
+			SEQ(der(c, r), BOUND(r, 0, max - 1)
+		else ZERO
+	}
+	case NOT(d) => if (c != d) ONE else ZERO
+
 	case RECD(_, r1) => der(c, r1)
 }
 
@@ -154,6 +176,8 @@ def flatten(v: Val) : String = v match {
 
 	case ChrSq(cl) => cl.mkString
 	case AnyChar(c) => c.toString
+	case Bounded(vs, n) => vs.map(flatten).mkString
+	case Nein(c) => c.toString
 	
 	case Rec(_, v) => flatten(v)
 
@@ -178,6 +202,8 @@ def env(v: Val) : List[(String, String)] = v match {
 
 	case ChrSq(cl) => Nil
 	case AnyChar(c) => Nil
+	case Bounded(vs, n) => vs.flatMap(env)
+	case Nein(c) => Nil
 
 	case Rec(x, vx) => (x, flatten(vx))::env(vx)
 
@@ -195,18 +221,27 @@ def mkeps(r: Rexp) : Val = r match {
 	case SEQ(r1, r2) => Sequ(mkeps(r1), mkeps(r2))
 	case STAR(reg) => Stars(Nil)
 	
-	case RANGE(_) => throw new Exception("The reg exp RANGE is not nullable.")
+	// case RANGE(_) => throw new Exception("The reg exp RANGE is not nullable.")
 	case PLUS(reg) => More(mkeps(reg), Stars(Nil))
 	case OPT(reg) => Opted(Empty)
 	case NTIMES(reg, n) => {
 		if (n == 0) Exact(Nil, 0)
 		else if (n > 0) Exact(List.fill(n)(Empty), n)
-		else throw new Exception("In NTIMES(r, n), n cannot be smaller than 0.")
+		else throw new Exception("mkeps() error, Rexp not nullable")
 	}
 
-	case CHARSEQ(cl) => throw new Exception("By definition, the reg exp CHARSEQ is not nullable.")
+	// case CHARSEQ(cl) => throw new Exception("By definition, the reg exp CHARSEQ is not nullable.")
 
-	case ANY => throw new Exception("The reg exp ANY is not nullable.")
+	// case ANY => throw new Exception("The reg exp ANY is not nullable.")
+
+	case BOUND(r, min, max) => {
+		if (min == 0 && max >= min) Bounded(Nil, 0)
+		else if (min < 0 && max >= 0) Bounded(Nil, 0)
+		else if (min > 0 && max >= min) Bounded(List.fill(min)(Empty), min)
+		else throw new Exception("mkeps() error, Rexp not nullable")
+	}
+
+	// case NOT(c) => throw new Exception("The reg exp NOT(c: Char) is not nullable.")
 
 	case RECD(x, reg) => Rec(x, mkeps(reg))
 	case _ => throw new Exception("mkeps() error, Rexp not nullable")
@@ -220,18 +255,23 @@ def inj(r: Rexp, c: Char, v: Val) : Val = (r, v) match {
 	case (SEQ(r1, r2), Right(v2)) => Sequ(mkeps(r1), inj(r2, c, v2))
 	case (ALT(r1, r2), Left(v1)) => Left(inj(r1, c, v1))
 	case (ALT(r1, r2), Right(v2)) => Right(inj(r2, c, v2))
-	case (CHAR(d), Empty) => Chr(c) 
+	case (CHAR(d), Empty) => Chr(c)
 	case (RANGE(charList), _) => Ranged(c)
 	case (PLUS(reg), Sequ(v1, Stars(l))) => More(inj(reg, c, v1), Stars(l))
 	case (OPT(reg), _) => Opted(inj(reg, c, v))
+
 	case (NTIMES(reg, n), Sequ(v1, Exact(l, m))) =>
-		if (m == n - 1) Exact(inj(reg, c, v1) :: l, m + 1)
+		if (m == n - 1) Exact(inj(reg, c, v1) :: l, n)
 		else throw new Exception("The injection process involving NTIMES and Exact is faulty.")
-	case (NTIMES(reg, n), _) => Exact(inj(reg, c, v) :: Nil, 1)
+	case (NTIMES(reg, n), _) => 
+		if (n == 1) Exact(inj(reg, c, v) :: Nil, 1)
+		else throw new Exception("The injection process involving NTIMES and Exact is faulty.")
 
 	case (CHARSEQ(lr), Empty) => ChrSq(List(c))
 	case (CHARSEQ(lr), ChrSq(lv)) if (! lv.isEmpty) => ChrSq(c :: lv)
 	case (ANY, Empty) => AnyChar(c)
+
+	
 
 	case (RECD(x, r1), _) => Rec(x, inj(r1, c, v))
 
