@@ -63,14 +63,18 @@ abstract class Token
 
 // some convenience for typing in regular expressions
 
-def charlist2rexp(s : List[Char]): Rexp = s match {
+def charlist2rexp(s: List[Char]): Rexp = s match {
 	case Nil => ONE
 	case c::Nil => CHAR(c)
 	case c::s => SEQ(CHAR(c), charlist2rexp(s))
 }
 
-implicit def string2rexp(s : String) : Rexp = {
+implicit def string2rexp(s: String) : Rexp = {
 	CHARSEQ(s.toList)
+}
+
+implicit def char2rexp(c: Char) : Rexp = {
+	CHAR(c)
 }
 
 implicit def RexpOps(r: Rexp) = new {
@@ -81,13 +85,20 @@ implicit def RexpOps(r: Rexp) = new {
 }
 
 implicit def stringOps(s: String) = new {
-
 	def | (r: Rexp) = ALT(s, r)
 	def | (r: String) = ALT(s, r)
-	def % = STAR(s)
+	def % = STAR(CHARSEQ(s.toList))
 	def ~ (r: Rexp) = SEQ(s, r)
 	def ~ (r: String) = SEQ(s, r)
 	def $ (r: Rexp) = RECD(s, r)
+}
+
+implicit def charOps(c: Char) = new {
+	def | (r: Rexp) = ALT(c, r)
+	def | (r: Char) = ALT(c, r)
+	def ~ (r: Rexp) = SEQ(c, r)
+	def ~ (r: Char) = SEQ(c, r)
+	def % = STAR(CHAR(c))
 }
 
 def nullable(r: Rexp) : Boolean = r match {
@@ -149,9 +160,9 @@ def der(c: Char, r: Rexp) : Rexp = r match {
 		if (min > 0 && max >= min)
 			SEQ(der(c, r), BOUND(r, min - 1, max - 1))
 		else if (min == 0 && max > min)
-			SEQ(der(c, r), BOUND(r, min, max - 1)
+			SEQ(der(c, r), BOUND(r, min, max - 1))
 		else if (min < 0 && max > 0)
-			SEQ(der(c, r), BOUND(r, 0, max - 1)
+			SEQ(der(c, r), BOUND(r, 0, max - 1))
 		else ZERO
 	}
 	case NOT(d) => if (c != d) ONE else ZERO
@@ -255,23 +266,34 @@ def inj(r: Rexp, c: Char, v: Val) : Val = (r, v) match {
 	case (SEQ(r1, r2), Right(v2)) => Sequ(mkeps(r1), inj(r2, c, v2))
 	case (ALT(r1, r2), Left(v1)) => Left(inj(r1, c, v1))
 	case (ALT(r1, r2), Right(v2)) => Right(inj(r2, c, v2))
+
+	case (CHARSEQ(lr), Empty) => ChrSq(List(c))
+	case (CHARSEQ(lr), ChrSq(lv)) if (! lv.isEmpty) => ChrSq(c :: lv)
+
 	case (CHAR(d), Empty) => Chr(c)
 	case (RANGE(charList), _) => Ranged(c)
 	case (PLUS(reg), Sequ(v1, Stars(l))) => More(inj(reg, c, v1), Stars(l))
 	case (OPT(reg), _) => Opted(inj(reg, c, v))
 
-	case (NTIMES(reg, n), Sequ(v1, Exact(l, m))) =>
-		if (m == n - 1) Exact(inj(reg, c, v1) :: l, n)
-		else throw new Exception("The injection process involving NTIMES and Exact is faulty.")
-	case (NTIMES(reg, n), _) => 
-		if (n == 1) Exact(inj(reg, c, v) :: Nil, 1)
-		else throw new Exception("The injection process involving NTIMES and Exact is faulty.")
-
-	case (CHARSEQ(lr), Empty) => ChrSq(List(c))
-	case (CHARSEQ(lr), ChrSq(lv)) if (! lv.isEmpty) => ChrSq(c :: lv)
 	case (ANY, Empty) => AnyChar(c)
 
-	
+	case (NTIMES(reg, n), Sequ(v1, Exact(l, m))) =>
+		if (m == n - 1) Exact(inj(reg, c, v1) :: l, n)
+		else {
+			println("The injection process involving NTIMES and Exact is faulty.")
+			NotMatched
+		}
+	case (NTIMES(reg, n), _) => 
+		if (n == 1) Exact(inj(reg, c, v) :: Nil, 1)
+		else {
+			println("The injection process involving NTIMES and Exact is faulty.")
+			NotMatched
+		}
+
+	case (BOUND(reg, min, max), Sequ(v1, Bounded(l, n))) => {
+		Bounded(inj(reg, c, v1) :: l, n + 1)
+	}
+	case (NOT(d), Empty) => Nein(c)
 
 	case (RECD(x, r1), _) => Rec(x, inj(r1, c, v))
 
