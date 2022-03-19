@@ -178,25 +178,35 @@ lazy val CardiParser: Parser[List[Token], Char] = {
 }
 
 lazy val UnaryBlock: Parser[List[Token], Rexp] = {
+	def charToReg(c: Char) : Rexp = CHAR(c)
+	def AddSign(r: Rexp, c: Char) : Rexp = c match {
+		case '*' => STAR(r)
+		case '+' => PLUS(r)
+		case '?' => OPT(r)
+		case _ => r
+	}
+
 	(CharParser ~ CardiParser).map[Rexp]{
-		r match {
-			case c ~ '*' => STAR(CHAR(c))
-			case c ~ '+' => PLUS(CHAR(c))
-			case c ~ '?' => OPT(CHAR(c))
-			case c ~ _ => CHAR(c)
-		}
+		case c ~ x => AddSign(charToReg(c), x)
 	} ||
-	(BracParser('(') ~ Block ~ BracParser(')')).map[Rexp]{ case _ ~ b => b } ||
+	(BracParser('(') ~ Block ~ BracParser(')') ~ CardiParser).map[Rexp]{
+		case _ ~ b ~ _ ~ x => AddSign(b, x)
+	} ||
+	(BracBlock ~ CardiParser).map[Rexp]{
+		case b ~ x => AddSign(b, x)
+	}
 	(SpecialOp('$')).map[Rexp]{ case _ => ANY }
 }
 
 lazy val AltReg: Parser[List[Token], Rexp] = {
-	(Block ~ SpecialOp('|') ~ AltParser).map[Rexp]{case r1 ~ _ ~ al => ALT(r1, al)} ||
-	(Block).map[Rexp]{r => r}
+	(BracParser('(') ~ Block ~ BracParser(')') ~ SpecialOp('|') ~ AltParser).map[Rexp]{case _ ~ r ~ _ ~ _ ~ al => ALT(r1, al)} ||
+	((UnaryBlock || BracBlock || MinMaxBlock) ~ SpecialOp('|') ~ AltParser).map[Rexp]{ case r ~ _ ~ al => ALT(r1, al) } ||
+	(BracParser('(') ~ Block ~ BracParser(')')).map[Rexp]{r => r} ||
+	(UnaryBlock || BracBlock || MinMaxBlock).map[Rexp]{r => r}
 }
 
 lazy val SeqReg: Parser[List[Token], Rexp] = {
-	(BracParser('(') ~ RegParser ~ BracParser(')')).map[Rexp]{
+	(BracParser('(') ~ Block ~ BracParser(')')).map[Rexp]{
 		case _ ~ r ~ _ => r
 	}
 }
@@ -206,7 +216,8 @@ lazy val BinaryBlock: Parser[List[Token], Rexp] = {
 }
 
 lazy val BracBlock: Parser[List[Token], Rexp] = {
-
+	(BracParser('[') ~ CharSeqParser ~ BracParser(']')).map[Rexp]{ case _ ~ l ~ _ => RANGE(l.toSet) } ||
+	(BracParser('[') ~ SpecialOp('^') ~ CharSeqParser ~ BracParser(']')).map[Rexp]{ case _ ~ _ ~ l ~ _ => NOT(l.toSet) }
 }
 
 lazy val MinMaxBlock: Parser[List[Token], Rexp] = {
@@ -221,9 +232,7 @@ lazy val Block: Parser[List[Token], Rexp] = {
 		case cs => CHARSEQ(cs)
 	}
 	} ||
-	BracBlock || MinMaxBlock ||
-	(BracParser('(') ~ Block ~ BracParser(')')).map[Rexp]{
-		case _ ~ b ~ _ => b
+	BracBlock || MinMaxBlock
 	}
 }
 

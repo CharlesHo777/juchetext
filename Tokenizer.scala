@@ -21,7 +21,7 @@ case class NTIMES(r: Rexp, n: Int) extends Rexp
 case class CHARSEQ(cl: List[Char]) extends Rexp
 case object ANY extends Rexp
 case class BOUND(r: Rexp, min: Int, max: Int) extends Rexp
-case class NOT(c: Char) extends Rexp
+case class NOT(s: Set[Char]) extends Rexp
 
 // records for extracting strings or tokens
 case class RECD(x: String, r: Rexp) extends Rexp
@@ -165,7 +165,7 @@ def der(c: Char, r: Rexp) : Rexp = r match {
 			SEQ(der(c, r), BOUND(r, 0, max - 1))
 		else ZERO
 	}
-	case NOT(d) => if (c != d) ONE else ZERO
+	case NOT(charSet) => if (charSet.contains(c)) ZERO else ONE
 
 	case RECD(_, r1) => der(c, r1)
 }
@@ -252,7 +252,7 @@ def mkeps(r: Rexp) : Val = r match {
 		else throw new Exception("mkeps() error, Rexp not nullable")
 	}
 
-	// case NOT(c) => throw new Exception("The reg exp NOT(c: Char) is not nullable.")
+	 // case NOT(_) => throw new Exception("The reg exp NOT(s: Set[Char]) is not nullable.")
 
 	case RECD(x, reg) => Rec(x, mkeps(reg))
 	case _ => throw new Exception("mkeps() error, Rexp not nullable")
@@ -271,29 +271,21 @@ def inj(r: Rexp, c: Char, v: Val) : Val = (r, v) match {
 	case (CHARSEQ(lr), ChrSq(lv)) if (! lv.isEmpty) => ChrSq(c :: lv)
 
 	case (CHAR(d), Empty) => Chr(c)
-	case (RANGE(charList), _) => Ranged(c)
+	case (RANGE(charSet), Empty) => Ranged(c)
 	case (PLUS(reg), Sequ(v1, Stars(l))) => More(inj(reg, c, v1), Stars(l))
 	case (OPT(reg), _) => Opted(inj(reg, c, v))
 
 	case (ANY, Empty) => AnyChar(c)
 
 	case (NTIMES(reg, n), Sequ(v1, Exact(l, m))) =>
-		if (m == n - 1) Exact(inj(reg, c, v1) :: l, n)
-		else {
-			println("The injection process involving NTIMES and Exact is faulty.")
-			NotMatched
-		}
+		Exact(inj(reg, c, v1) :: l, n)
 	case (NTIMES(reg, n), _) => 
-		if (n == 1) Exact(inj(reg, c, v) :: Nil, 1)
-		else {
-			println("The injection process involving NTIMES and Exact is faulty.")
-			NotMatched
-		}
+		Exact(inj(reg, c, v) :: Nil, 1)
 
 	case (BOUND(reg, min, max), Sequ(v1, Bounded(l, n))) => {
 		Bounded(inj(reg, c, v1) :: l, n + 1)
 	}
-	case (NOT(d), Empty) => Nein(c)
+	case (NOT(charSet), Empty) => Nein(c)
 
 	case (RECD(x, r1), _) => Rec(x, inj(r1, c, v))
 
