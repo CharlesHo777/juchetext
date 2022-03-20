@@ -1,5 +1,11 @@
 
 
+package jucheparse
+
+
+object RegexParser {
+
+
 val LETTER = RANGE((('a' to 'z') ++ ('A' to 'Z')).toSet)
 
 val NUMBER = RANGE('0' to '9')
@@ -34,28 +40,27 @@ case class T_L(l: Char) extends Token
 case class T_N(n: Char) extends Token
 case class T_OP(op: Char) extends Token
 case class T_BR(br: Char) extends Token
-case class T_SP(col: Char) extends Token
+case class T_SP(sp: Char) extends Token
 case class T_ESC(esc: Char) extends Token
 case object T_ERROR extends Token
 
 
 val token : PartialFunction[(String, String), Token] = {
-	try {
-		case ("l", s) => T_L(s.head)
-		case ("n", s) => T_N(s.head)
-		case ("op", s) => T_OP(s.head)
-		case ("br", s) => T_BR(s.head)
-		case ("sp", s) => T_SP(s.head)
-		case ("esc", s) => s.tail.toList match {
-			case 'n' :: cs => T_ESC('\n')
-			case 't' :: cs => T_ESC('\t')
-			case 'r' :: cs => T_ESC('\r')
-			case c :: cs => T_ESC(c)
-		}
-	} catch {
-		case e: Exception => T_ERROR
+	case ("l", s) => T_L(s.head)
+	case ("n", s) => T_N(s.head)
+	case ("op", s) => T_OP(s.head)
+	case ("br", s) => T_BR(s.head)
+	case ("sp", s) => T_SP(s.head)
+	case ("esc", s) => s.tail.toList match {
+		case 'n' :: cs => T_ESC('\n')
+		case 't' :: cs => T_ESC('\t')
+		case 'r' :: cs => T_ESC('\r')
+		case c :: cs => T_ESC(c)
 	}
 }
+
+def tokenize(s: String) : List[Token] = 
+	lex(REGEX, s).collect(token)
 
 
 
@@ -93,28 +98,21 @@ class SeqParser[I : IsSeq, T, S](p: => Parser[I, T],
 // alternative parser
 class AltParser[I : IsSeq, T](p: => Parser[I, T], 
                               q: => Parser[I, T]) extends Parser[I, T] {
-  def parse(in: I) = p.parse(in) ++ q.parse(in)   
+  def parse(in: I) = p.parse(in) ++ q.parse(in)
+	/*
+	def parse(in: I) = {
+		val p_res = p.parse(in)
+		if (p_res.isEmpty)
+			q.parse(in)
+		else p_res
+	}*/
 }
-
-// class AltParser[I : IsSeq, T](pl: List[Parser]
 
 // map parser
 class MapParser[I : IsSeq, T, S](p: => Parser[I, T], 
                                  f: T => S) extends Parser[I, S] {
   def parse(in: I) = for ((hd, tl) <- p.parse(in)) yield (f(hd), tl)
 }
-
-
-/*
-// atomic parser for (particular) strings
-case class StrParser(s: String) extends Parser[String, String] {
-  def parse(sb: String) = {
-    val (prefix, suffix) = sb.splitAt(s.length)
-    if (prefix == s) Set((prefix, suffix)) else Set()
-  }
-}
-*/
-
 
 case object CharParser extends Parser[List[Token], Char] {
 	def parse(tl: List[Token]) = {
@@ -129,19 +127,40 @@ case object CharParser extends Parser[List[Token], Char] {
 	}
 }
 
+case object CommaParser extends Parser[List[Token], Char] {
+	def parse(tl: List[Token]) = {
+		if (tl != Nil) tl match {
+			case T_OP(c) :: ts if (c == ',') => Set((c, ts))
+			case _ => Set()
+		}
+		else Set()
+	}
+}
+
 case class SpecialOp(c: Char) extends Parser[List[Token], Char] {
 	def parse(tl: List[Token]) = {
 		if (tl != Nil) tl match {
 			case T_SP(sp) :: ts => if (sp == c) Set((c, ts)) else Set()
 			case _ => Set()
 		}
+		else Set()
 	}
 }
 
 case class BracParser(c: Char) extends Parser[List[Token], Char] {
 	def parse(tl: List[Token]) = {
 		if (tl != Nil) tl match {
-			case T_BRAC(br) :: ts => if (br == c) Set((c, ts)) else Set()
+			case T_BR(br) :: ts => if (br == c) Set((c, ts)) else Set()
+			case _ => Set()
+		}
+		else Set()
+	}
+}
+
+case object NumParser extends Parser[List[Token], Char] {
+	def parse(tl: List[Token]) = {
+		if (tl != Nil) tl match {
+			case T_N(c) :: ts => Set((c, ts))
 			case _ => Set()
 		}
 		else Set()
@@ -189,30 +208,31 @@ lazy val UnaryBlock: Parser[List[Token], Rexp] = {
 	(CharParser ~ CardiParser).map[Rexp]{
 		case c ~ x => AddSign(charToReg(c), x)
 	} ||
-	(BracParser('(') ~ Block ~ BracParser(')') ~ CardiParser).map[Rexp]{
+	((CharSeqReg || BracBlock) ~ CardiParser).map[Rexp]{
+		case b ~ x => AddSign(b, x)
+	} ||
+	(BracParser('(') ~ Reg ~ BracParser(')') ~ CardiParser).map[Rexp]{
 		case _ ~ b ~ _ ~ x => AddSign(b, x)
 	} ||
-	(BracBlock ~ CardiParser).map[Rexp]{
-		case b ~ x => AddSign(b, x)
-	}
 	(SpecialOp('$')).map[Rexp]{ case _ => ANY }
 }
 
 lazy val AltReg: Parser[List[Token], Rexp] = {
-	(BracParser('(') ~ Block ~ BracParser(')') ~ SpecialOp('|') ~ AltParser).map[Rexp]{case _ ~ r ~ _ ~ _ ~ al => ALT(r1, al)} ||
-	((UnaryBlock || BracBlock || MinMaxBlock) ~ SpecialOp('|') ~ AltParser).map[Rexp]{ case r ~ _ ~ al => ALT(r1, al) } ||
-	(BracParser('(') ~ Block ~ BracParser(')')).map[Rexp]{r => r} ||
-	(UnaryBlock || BracBlock || MinMaxBlock).map[Rexp]{r => r}
-}
-
-lazy val SeqReg: Parser[List[Token], Rexp] = {
-	(BracParser('(') ~ Block ~ BracParser(')')).map[Rexp]{
-		case _ ~ r ~ _ => r
+	(Cluster ~ SpecialOp('|') ~ AltReg).map[Rexp]{
+		case r ~ _ ~ al => ALT(r, al)
+	} ||
+	(Cluster ~ SpecialOp('|') ~ Cluster).map[Rexp]{
+		case c1 ~ _ ~ c2 => ALT(c1, c2)
 	}
 }
 
-lazy val BinaryBlock: Parser[List[Token], Rexp] = {
-	AltReg || SeqReg
+lazy val Cluster: Parser[List[Token], Rexp] = {
+	UnaryBlock || CharSeqReg ||
+	BracBlock || MinMaxBlock ||
+	(BracParser('(') ~ Reg ~ BracParser(')')).map[Rexp]{
+		case _ ~ r ~ _ => r
+	} ||
+	(CharParser).map[Rexp]{ c => CHAR(c) }
 }
 
 lazy val BracBlock: Parser[List[Token], Rexp] = {
@@ -221,37 +241,83 @@ lazy val BracBlock: Parser[List[Token], Rexp] = {
 }
 
 lazy val MinMaxBlock: Parser[List[Token], Rexp] = {
+	def makeReg(r: Rexp, min: Int, max: Int) : Rexp = {
+		if (min == max && min >= 0) NTIMES(r, min)
+		else if (max > min && max >= 0) BOUND(r, min, max)
+		else ZERO
+	}
 
+	(CharParser ~ LimitParser).map[Rexp]{
+		case c ~ limit => makeReg(CHAR(c), limit._1, limit._2)
+	} ||
+	((BracBlock || CharSeqReg) ~ LimitParser).map[Rexp]{
+		case b ~ limit => makeReg(b, limit._1, limit._2)
+	} ||
+	(BracParser('(') ~ Block ~ BracParser(')') ~ LimitParser).map[Rexp]{
+		case _ ~ b ~ _ ~ limit => makeReg(b, limit._1, limit._2)
+	}
+}
+
+lazy val LimitParser: Parser[List[Token], (Int, Int)] = {
+	(BracParser('{') ~ DigitsParser ~ BracParser('}')).map{
+		case _ ~ ds ~ _ => {
+			val n = try {ds.mkString.toInt} catch {case e: Exception => 0}
+			(n, n)
+		}
+	} ||
+	(BracParser('{') ~ DigitsParser ~ CommaParser ~ DigitsParser ~ BracParser('}')).map{
+		case _ ~ min ~ _ ~ max ~ _ => try {
+			(min.mkString.toInt, max.mkString.toInt)
+		} catch { case e: Exception => (0, 0) }
+	}
+}
+
+lazy val DigitsParser: Parser[List[Token], List[Char]] = {
+	(NumParser ~ DigitsParser).map{
+		case d ~ ds => d :: ds
+	} ||
+	(NumParser).map{
+		case d => List[Char](d)
+	}
+}
+
+lazy val CharSeqReg: Parser[List[Token], Rexp] = {
+	(BracParser('(') ~ CharSeqParser ~ BracParser(')')).map[Rexp]{
+		case _ ~ l ~ _ => l match {
+			case Nil => ONE
+			case c :: Nil => CHAR(c)
+			case cs => CHARSEQ(cs)
+		}
+	}
 }
 
 lazy val Block: Parser[List[Token], Rexp] = {
-	UnaryBlock || BinaryBlock ||
-	(CharSeqParser).map[Rexp]{ l match {
-		case Nil => ONE
-		case c :: Nil => CHAR(c)
-		case cs => CHARSEQ(cs)
-	}
-	} ||
-	BracBlock || MinMaxBlock
+	UnaryBlock || CharSeqReg ||
+	BracBlock || MinMaxBlock ||
+	AltReg
+}
+
+lazy val Reg: Parser[List[Token], Rexp] = {
+	(Block).map[Rexp]{ b => b } ||
+	(Block ~ Reg).map[Rexp]{ case b ~ bs => SEQ(b, bs) } ||
+	(BracParser('(') ~ Block ~ BracParser(')')).map[Rexp]{
+		case _ ~ b ~ _ => b
 	}
 }
 
-lazy val RegParser: Parser[List[Token], Rexp] = {
-	(Block ~ RegParser).map[Rexp]{case r ~ rs => SEQ(r, rs)} ||
-	(Block).map[Rexp]{r => r}
+
+def parse(s: String) : Rexp = {
+	try { Reg.parse_all(tokenize(s)).head }
+	catch { case e: Exception => ZERO }
 }
 
-case class ALT(r1: Rexp, r2: Rexp) extends Rexp
-case class SEQ(r1: Rexp, r2: Rexp) extends Rexp
-case class STAR(r: Rexp) extends Rexp
-case class RANGE(s: Set[Char]) extends Rexp
-case class PLUS(r: Rexp) extends Rexp
-case class OPT(r: Rexp) extends Rexp
-case class NTIMES(r: Rexp, n: Int) extends Rexp
-case class BOUND(r: Rexp, min: Int, max: Int) extends Rexp
-case class CHARSEQ(cl: List[Char]) extends Rexp
-case object ANY extends Rexp
-case class NOT(c: Char) extends Rexp
+def parse_tokens(tl: List[Token]) : Rexp = {
+	try { Reg.parse_all(tl).head }
+	catch { case e: Exception => ZERO }
+}
+
+
+}
 
 
 
