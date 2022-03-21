@@ -1,47 +1,47 @@
 
-grammar lewd.dprk;
-
-import "phuc";
-
-
+grammar lewd.dprk
 
 program Robots {
-	messages+=(Message)*,
+	messages+=(Message)*;
 	actions+=(Move)*
-};
+}
 
 rule Message {
 	Greeting | Direction | Alarm
-};
+}
 
-terminal Greeting {
+terminal Regger {
+	(a)a*b*a|b|c[abcde]{1,2}|(abbccd)
+}
+
+enum Greeting {
 	"good morning" | "good day" | "good afternoon" | "good evening" | "good night" | "bonsoir" | "go back to sleep you little retard" | "nighty night!"
-};
+}
 
 rule Ritual {
-	"say" "out" greeting=Greeting,
+	"say" "out" greeting=Greeting;
 	"go" "forward" distance=Int "meters"
-};
+}
 
 rule Move {
 	Forward | Backward | Left | Right
-};
+}
 
 rule Forward {
 	"go" "forward" distance=Int "meters"
-};
+}
 
 rule Backward {
 	"go" "backward" distance=Int "meters"
-};
+}
 
 rule Left {
 	"go" "left" distance=Int "meters"
-};
+}
 
 rule Right {
 	"go" "right" distance=Int "meters"
-};
+}
 
 
 

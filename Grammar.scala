@@ -1,6 +1,5 @@
 
-
-package jucheparse
+// package jucheparse
 
 /*
 	This .scala file contains the parser for the grammar file containing the syntax definitions of a user-defined programming language. The output of this parser would be an abstract syntax tree that would be further processed with the ultimate goal of generating a lexical analyzer and a parser for the aforementioned programming language.
@@ -10,7 +9,7 @@ object Grammar {
 
 // Lexer & Parser For The Grammar Language
 
-val KEYS = ("rule" | "enumerate" | "terminal" | "returns" | "current" | "hidden" | "abstract" | "component" | "ID" | "INT" | "DOUBLE" | "STRING" | "grammar" | "with" | "generate" | "program" | "import" | "as")
+val KEYS = ("rule" | "enumerate" | "terminal" | "returns" | "current" | "hidden" | "abstract" | "fragment" | "ID" | "INT" | "DOUBLE" | "STRING" | "grammar" | "program")
 
 val LETTER = RANGE((('a' to 'z') ++ ('A' to 'Z')).toSet)
 
@@ -42,7 +41,10 @@ val STRING = (CHAR('\"') ~ (SYMBOL | WHITESPACE | "\\\"" | "\\\'").% ~ CHAR('\"'
 
 val COMMENT = ("//" ~ STAR(SYMBOL | RANGE(Set(' ', '\"', '\'', '\t', '\r', '\"', '\''))) ~ "\n")
 
-val CHARACTER = (CHAR('\'') ~ (SYMBOL | RANGE(Set(' ', '\n', '\t', '\r')) | ("\\\\" | "\\\"" | "\\\'" | "\\n" | "\\t" | "\\r")) ~ CHAR('\''))
+val WSCHAR = (CHAR('\'') ~ (
+		CHAR(' ') | ( CHAR('\\') ~ RANGE(Set('n', 't', 'r')) )
+	) ~ CHAR('\'')
+)
 
 val GRAMMAR_LANG = {
 	STAR(
@@ -52,7 +54,7 @@ val GRAMMAR_LANG = {
 		("int" $ INT) |
 		("db" $ DOUBLE) |
 		("str" $ STRING) |
-		("char" $ CHARACTER) |
+		("char" $ WSCHAR) |
 		("space" $ WHITESPACE) |
 		("brac" $ BRACKET) |
 		("colon" $ COLON) |
@@ -90,66 +92,9 @@ val token : PartialFunction[(String, String), Token] = {
 def tokenize(s: String) : List[Token] = 
   lex(GRAMMAR_LANG, s).collect(token)
 
-
 // END OF LEXER
 
-
 // START OF PARSER
-
-
-case class ~[+A, +B](x: A, y: B)
-
-// constraint for the input
-type IsSeq[A] = A => Seq[_]
-
-abstract class Parser[I : IsSeq, T]{
-  def parse(in: I): Set[(T, I)]
-
-  def parse_all(in: I) : Set[T] =
-    for ((hd, tl) <- parse(in); 
-        if tl.isEmpty) yield hd
-}
-
-case class TKP(t: Token) extends Parser[List[Token], Token] {
-  def parse(in: List[Token]) = 
-    if (in == Nil) Set()
-    else if (in.head == t) Set((t, in.tail))
-    else Set()
-}
-
-// parser combinators
-
-// sequence parser
-class SeqParser[I : IsSeq, T, S](p: => Parser[I, T], 
-                                 q: => Parser[I, S]) extends Parser[I, ~[T, S]] {
-  def parse(in: I) = 
-    for ((hd1, tl1) <- p.parse(in); 
-         (hd2, tl2) <- q.parse(tl1)) yield (new ~(hd1, hd2), tl2)
-}
-
-// alternative parser
-class AltParser[I : IsSeq, T](p: => Parser[I, T], 
-                              q: => Parser[I, T]) extends Parser[I, T] {
-  def parse(in: I) = p.parse(in) ++ q.parse(in)   
-}
-
-// class AltParser[I : IsSeq, T](pl: List[Parser]
-
-// map parser
-class MapParser[I : IsSeq, T, S](p: => Parser[I, T], 
-                                 f: T => S) extends Parser[I, S] {
-  def parse(in: I) = for ((hd, tl) <- p.parse(in)) yield (f(hd), tl)
-}
-
-/*
-// atomic parser for (particular) strings
-case class StrParser(s: String) extends Parser[String, String] {
-  def parse(sb: String) = {
-    val (prefix, suffix) = sb.splitAt(s.length)
-    if (prefix == s) Set((prefix, suffix)) else Set()
-  }
-}
-*/
 
 // atomic parser for identifiers (variable names)
 case object IdParser extends Parser[List[Token], String] {
@@ -238,31 +183,13 @@ case object AssignParser extends Parser[List[Token], String] {
 	}
 }
 
-// the following string interpolation allows us to write 
-// StrParser(_some_string_) more conveniently as 
-//
-// p"<_some_string_>" 
-
-/*
-implicit def parser_interpolation(sc: StringContext) = new {
-    def p(args: Any*) = StrParser(sc.s(args:_*))
-}    
-*/
-
-// more convenient syntax for parser combinators
-implicit def ParserOps[I : IsSeq, T](p: Parser[I, T]) = new {
-  def ||(q : => Parser[I, T]) = new AltParser[I, T](p, q)
-  def ~[S] (q : => Parser[I, S]) = new SeqParser[I, T, S](p, q)
-  def map[S](f: => T => S) = new MapParser[I, T, S](p, f)
-}
-
 // the abstract syntax trees for the grammar language
 
 abstract class Elem
 abstract class Exp
 abstract class Stmt
 
-case class Heading(kwd: String, p1: String, p2: String) extends Stmt
+case class Title(p: String) extends Stmt
 
 case class Program(id: String, exps: List[Exp]) extends Stmt
 case class Rule(id: String, exps: List[Exp], mod: Modifier) extends Stmt
@@ -278,6 +205,8 @@ case class RefExp(r: String) extends Exp
 case class TypeExp(t: String) extends Exp
 case class CardiExp(e: Exp, c: Cardi) extends Exp
 case class Action(i: String) extends Exp
+case class WS(c: Char, n: Int) extends Exp
+case object NewLine extends Exp
 
 // case class IElem(n: String, v: Int) extends Elem
 // case class DElem(n: String, v: Double) extends Elem
@@ -321,22 +250,24 @@ case object CardiParser extends Parser[List[Token], Cardi] {
 }
 
 lazy val Stmt: Parser[List[Token], Stmt] = {
-	(TKP(T_KEY("rule")) ~ IdParser ~ Mod ~ Block ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{
-		case _ ~ id ~ m ~ es ~ _ ~ _ => Rule(id, es, m)
+	(TKP(T_KEY("rule")) ~ IdParser ~ Mod ~ Block ~ BracParser('}')).map[Stmt]{
+		case _ ~ id ~ m ~ es ~ _ => Rule(id, es, m)
 	} ||
-	(TKP(T_KEY("enumerate")) ~ IdParser ~ Mod ~ Enum ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{
-		case _ ~ id ~ m ~ en ~ _ ~ _ => Enumerate(id, en, m)
+	(TKP(T_KEY("enumerate")) ~ IdParser ~ Mod ~ Enum ~ BracParser('}')).map[Stmt]{
+		case _ ~ id ~ m ~ en ~ _ => Enumerate(id, en, m)
 	} ||
-	(TKP(T_KEY("terminal")) ~ IdParser ~ Mod ~ Pattern ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{
-		case _ ~ id ~ m ~ p ~ _ ~ _ => Terminal(id, p, m, false)
+	(TKP(T_KEY("terminal")) ~ IdParser ~ Mod ~ Pattern ~ BracParser('}')).map[Stmt]{
+		case _ ~ id ~ m ~ p ~ _ => Terminal(id, p, m, false)
 	} ||
-	(TKP(T_KEY("terminal")) ~ TKP(T_KEY("component")) ~ IdParser ~ Mod ~ Pattern ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{
-		case _ ~ _ ~ id ~ m ~ p ~ _ ~ _ => Terminal(id, p, m, true)
+	(TKP(T_KEY("terminal")) ~ TKP(T_KEY("fragment")) ~ IdParser ~ Mod ~ Pattern ~ BracParser('}')).map[Stmt]{
+		case _ ~ _ ~ id ~ m ~ p ~ _ => Terminal(id, p, m, true)
+	} ||
+	(TKP(T_KEY("program")) ~ IdParser ~ BracParser('{') ~ Block ~ BracParser('}')).map[Stmt]{
+		case _ ~ id ~ _ ~ es ~ _ => Program(id, es)
+	} ||
+	(TKP(T_KEY("grammar")) ~ Path).map[Stmt]{
+		case _ ~ p => Title(p)
 	}
-	(TKP(T_KEY("program")) ~ IdParser ~ BracParser('{') ~ Block ~ BracParser('}') ~ ColonParser(';')).map[Stmt]{
-		case _ ~ id ~ _ ~ es ~ _ ~ _ => Program(id, es)
-	} ||
-	Head
 }
 
 lazy val Mod: Parser[List[Token], Modifier] = {
@@ -354,24 +285,6 @@ lazy val Hiddens: Parser[List[Token], List[String]] = {
 		case h ~ _ ~ hs => h :: hs
 	} ||
 	(IdParser).map{h => List(h)}
-}
-
-lazy val Head: Parser[List[Token], Stmt] = {
-	(TKP(T_KEY("grammar")) ~ Path ~ ColonParser(';')).map[Stmt]{
-		case _ ~ p1 ~ _ => Heading("grammar", p1, "")
-	} ||
-	(TKP(T_KEY("grammar")) ~ Path ~ TKP(T_KEY("with")) ~ Path ~ ColonParser(';')).map[Stmt]{
-		case _ ~ p1 ~ _ ~ p2 ~ _ => Heading("grammar", p1, p2)
-	} ||
-	(TKP(T_KEY("generate")) ~ IdParser ~ StrParser ~ ColonParser(';')).map[Stmt]{
-		case _ ~ o ~ s ~ _ => Heading("generate", o, s)
-	} ||
-	(TKP(T_KEY("import")) ~ StrParser ~ ColonParser(';')).map[Stmt]{
-		case _ ~ s ~ _ => Heading("import", s, "")
-	} ||
-	(TKP(T_KEY("import")) ~ StrParser ~ TKP(T_KEY("as")) ~ IdParser ~ ColonParser(';')).map[Stmt]{
-		case _ ~ s ~ _ ~ id ~ _ => Heading("import", s, id)
-	}
 }
 
 lazy val Path: Parser[List[Token], String] = {
@@ -406,28 +319,20 @@ lazy val Exp: Parser[List[Token], Exp] = {
 }
 
 lazy val Block: Parser[List[Token], List[Exp]] = {
-	(Line ~ TKP(T_OP(",")) ~ Block).map[List[Exp]]{
-		case l ~ _ ~ b => l :: b
+	((Exp || AltDef) ~ Block).map[List[Exp]]{
+		case e ~ b => e :: b
 	} ||
-	Line.map[List[Exp]]{l => List(l)}
-}
-
-lazy val Line: Parser[List[Token], Exp] = {
-  (AltDef).map[Exp]{al => al} ||
-  (SeqDef).map[Exp]{sq => sq} ||
-  Exp
+	(ColonParser(';') ~ Block).map[List[Exp]]{
+		case _ ~ b => NewLine :: b
+	} ||
+	(Exp || AltDef).map[List[Exp]]{
+		e => List(e)
+	}
 }
 
 lazy val AltDef: Parser[List[Token], Exp] = {
 	(Exp ~ TKP(T_OP("|")) ~ AltDef).map[Exp]{
 		case e ~ _ ~ al => AltExp(e, al)
-	} ||
-	Exp
-}
-
-lazy val SeqDef: Parser[List[Token], Exp] = {
-	(Exp ~ SeqDef).map[Exp]{
-		case e ~ sq => SeqExp(e, sq)
 	} ||
 	Exp
 }
@@ -451,18 +356,27 @@ lazy val Pattern: Parser[List[Token], Rexp] = {
 	RegexParser.Reg
 }
 
-lazy val Grammar: Parser[List[Token], List[Stmt]] = {
-	(Stmt ~ Grammar).map{case s ~ g => s :: g} ||
+lazy val Stmts: Parser[List[Token], List[Stmt]] = {
+	(Stmt ~ Stmts).map{case s ~ g => s :: g} ||
 	Stmt.map{s => List(s)}
 }
 
-def parse(code: String) : List[Stmt] = Grammar.parse_all(tokenize(code)).head
+def parse(code: String) : List[Stmt] = try {
+	Stmts.parse_all(tokenize(code)).head
+} catch {
+	case e: Exception => Nil
+}
 
-def parse_tokens(tl: List[Token]) : List[Stmt] = Grammar.parse_all(tl).head
+def parse_tokens(tl: List[Token]) : List[Stmt] = try {
+	Stmts.parse_all(tl).head
+} catch {
+	case e: Exception => Nil
+}
 
+// END OF OBJECT Grammar
 
 }
 
-
 // Consider adding Actions
 
+// END OF FILE Grammar.scala

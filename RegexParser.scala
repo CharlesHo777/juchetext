@@ -1,10 +1,7 @@
 
-
-package jucheparse
-
+// package jucheparse
 
 object RegexParser {
-
 
 val LETTER = RANGE((('a' to 'z') ++ ('A' to 'Z')).toSet)
 
@@ -62,57 +59,9 @@ val token : PartialFunction[(String, String), Token] = {
 def tokenize(s: String) : List[Token] = 
 	lex(REGEX, s).collect(token)
 
+// END OF LEXER
 
-
-case class ~[+A, +B](x: A, y: B)
-
-// constraint for the input
-type IsSeq[A] = A => Seq[_]
-
-abstract class Parser[I : IsSeq, T]{
-  def parse(in: I): Set[(T, I)]
-
-  def parse_all(in: I) : Set[T] =
-    for ((hd, tl) <- parse(in); 
-        if tl.isEmpty) yield hd
-}
-
-case class TKP(t: Token) extends Parser[List[Token], Token] {
-  def parse(in: List[Token]) = 
-    if (in == Nil) Set()
-    else if (in.head == t) Set((t, in.tail))
-    else Set()
-}
-
-
-// parser combinators
-
-// sequence parser
-class SeqParser[I : IsSeq, T, S](p: => Parser[I, T], 
-                                 q: => Parser[I, S]) extends Parser[I, ~[T, S]] {
-  def parse(in: I) = 
-    for ((hd1, tl1) <- p.parse(in); 
-         (hd2, tl2) <- q.parse(tl1)) yield (new ~(hd1, hd2), tl2)
-}
-
-// alternative parser
-class AltParser[I : IsSeq, T](p: => Parser[I, T], 
-                              q: => Parser[I, T]) extends Parser[I, T] {
-  def parse(in: I) = p.parse(in) ++ q.parse(in)
-	/*
-	def parse(in: I) = {
-		val p_res = p.parse(in)
-		if (p_res.isEmpty)
-			q.parse(in)
-		else p_res
-	}*/
-}
-
-// map parser
-class MapParser[I : IsSeq, T, S](p: => Parser[I, T], 
-                                 f: T => S) extends Parser[I, S] {
-  def parse(in: I) = for ((hd, tl) <- p.parse(in)) yield (f(hd), tl)
-}
+// START OF PARSER
 
 case object CharParser extends Parser[List[Token], Char] {
 	def parse(tl: List[Token]) = {
@@ -166,26 +115,6 @@ case object NumParser extends Parser[List[Token], Char] {
 		else Set()
 	}
 }
-
-
-// the following string interpolation allows us to write 
-// StrParser(_some_string_) more conveniently as 
-//
-// p"<_some_string_>" 
-
-/*
-implicit def parser_interpolation(sc: StringContext) = new {
-    def p(args: Any*) = StrParser(sc.s(args:_*))
-}    
-*/
-
-// more convenient syntax for parser combinators
-implicit def ParserOps[I : IsSeq, T](p: Parser[I, T]) = new {
-  def ||(q : => Parser[I, T]) = new AltParser[I, T](p, q)
-  def ~[S] (q : => Parser[I, S]) = new SeqParser[I, T, S](p, q)
-  def map[S](f: => T => S) = new MapParser[I, T, S](p, f)
-}
-
 
 lazy val CharSeqParser: Parser[List[Token], List[Char]] = {
 	(CharParser ~ CharSeqParser).map{case c ~ cs => c :: cs} ||
@@ -305,7 +234,6 @@ lazy val Reg: Parser[List[Token], Rexp] = {
 	}
 }
 
-
 def parse(s: String) : Rexp = {
 	try { Reg.parse_all(tokenize(s)).head }
 	catch { case e: Exception => ZERO }
@@ -316,8 +244,8 @@ def parse_tokens(tl: List[Token]) : Rexp = {
 	catch { case e: Exception => ZERO }
 }
 
+// END OF OBJECT RegexParser
 
 }
 
-
-
+// END OF FILE RegexParser.scala

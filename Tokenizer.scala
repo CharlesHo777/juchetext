@@ -1,7 +1,5 @@
 
-
-package jucheparse
-
+// package jucheparse
 
 // regular expressions including records
 abstract class Rexp
@@ -56,10 +54,7 @@ case class AnyChar(c: Char) extends Val
 case class Bounded(vs: List[Val], n: Int) extends Val
 case class Nein(c: Char) extends Val
 
-
-
 abstract class Token 
-
 
 // some convenience for typing in regular expressions
 
@@ -383,9 +378,7 @@ def lex_simp(r: Rexp, s: List[Char]) : Val = s match {
 	}
 }
 
-
 def lex(r: Rexp, s: String) = 
 	env(lex_simp(r, s.toList))
 
-
-
+// END OF FILE Tokenizer.scala
