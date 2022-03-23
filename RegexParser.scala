@@ -7,7 +7,9 @@ val LETTER = RANGE((('a' to 'z') ++ ('A' to 'Z')).toSet)
 
 val NUMBER = RANGE('0' to '9')
 
-val OP = RANGE(Set('\"', '\'', '_', '-', '/', '%', '=', ',', '.', ':', ';', '>', '<', '~', '!', '&', '#', '`', '@'))
+val OP = RANGE(Set('_', '-', '/', '%', '=', ',', '.', ':', ';', '>', '<', '~', '!', '&', '#', '`', '@'))
+
+val QUOTE = RANGE(Set('\"', '\''))
 
 val BRACKET = RANGE(Set('(', ')', '{', '}', '[', ']'))
 
@@ -20,7 +22,7 @@ val CHARACTER = (LETTER | NUMBER | SYMBOL)
 val WHITESPACE = PLUS(RANGE(Set(' ', '\n', '\t', '\r')))
 
 val ESCAPED = (
-	(CHAR('\\') ~ ((BRACKET | SPECIAL) | (" " | "n" | "t" | "r")))
+	(CHAR('\\') ~ ((BRACKET | SPECIAL | QUOTE) | (" " | "n" | "t" | "r")))
 )
 
 val REGEX = STAR(
@@ -110,6 +112,26 @@ case object NumParser extends Parser[List[Token], Char] {
 	def parse(tl: List[Token]) = {
 		if (tl != Nil) tl match {
 			case T_N(c) :: ts => Set((c, ts))
+			case _ => Set()
+		}
+		else Set()
+	}
+}
+
+case object LetterParser extends Parser[List[Token], Char] {
+	def parse(tl: List[Token]) = {
+		if (tl != Nil) tl match {
+			case T_L(c) :: ts => Set((c, ts))
+			case _ => Set()
+		}
+		else Set()
+	}
+}
+
+case object UnderscoreParser extends Parser[List[Token], Char] {
+	def parse(tl: List[Token]) = {
+		if (tl != Nil) tl match {
+			case T_OP('_') :: ts => Set(('_', ts))
 			case _ => Set()
 		}
 		else Set()
@@ -220,10 +242,28 @@ lazy val CharSeqReg: Parser[List[Token], Rexp] = {
 	}
 }
 
+lazy val Reference: Parser[List[Token], Rexp] = {
+	(BracParser('{') ~ SpecialOp('$') ~ IdParser ~ BracParser('}')).map[Rexp]{
+		case _ ~ _ ~ cs ~ _ => (cs.mkString $ ONE)
+	}
+}
+
+lazy val IdParser: Parser[List[Token], List[Char]] = {
+	(LetterParser ~ IdParser).map{
+		case l ~ ls => l :: ls
+	} ||
+	(LetterParser ~ UnderscoreParser ~ IdParser).map{
+		case l ~ u ~ ls => l :: u :: ls
+	} ||
+	(LetterParser || UnderscoreParser).map{
+		c => List(c)
+	}
+}
+
 lazy val Block: Parser[List[Token], Rexp] = {
 	UnaryBlock || CharSeqReg ||
 	BracBlock || MinMaxBlock ||
-	AltReg
+	AltReg || Reference
 }
 
 lazy val Reg: Parser[List[Token], Rexp] = {

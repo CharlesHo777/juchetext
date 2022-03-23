@@ -1,9 +1,9 @@
 
-grammar lewd.dprk
+grammar dprk
 
 program Robots {
-	messages+=(Message)*;
-	actions+=(Move)*
+	(Message)*;
+	(Move)*
 }
 
 rule Message {
@@ -11,16 +11,16 @@ rule Message {
 }
 
 terminal Regger {
-	(a)a*b*a|b|c[abcde]{1,2}|(abbccd)
+	"(a)a*b*a|b|c[abcde]{1,2}|(abbccd)"
 }
 
-enum Greeting {
+enumerate Greeting {
 	"good morning" | "good day" | "good afternoon" | "good evening" | "good night" | "bonsoir" | "go back to sleep you little retard" | "nighty night!"
 }
 
 rule Ritual {
-	"say" "out" greeting=Greeting;
-	"go" "forward" distance=Int "meters"
+	"say" "out" Greeting;
+	"go" "forward" INT "meters"
 }
 
 rule Move {
@@ -28,19 +28,19 @@ rule Move {
 }
 
 rule Forward {
-	"go" "forward" distance=Int "meters"
+	"go" "forward" INT "meters"
 }
 
 rule Backward {
-	"go" "backward" distance=Int "meters"
+	"go" "backward" INT "meters"
 }
 
 rule Left {
-	"go" "left" distance=Int "meters"
+	"go" "left" INT "meters"
 }
 
 rule Right {
-	"go" "right" distance=Int "meters"
+	"go" "right" INT "meters"
 }
 
 
