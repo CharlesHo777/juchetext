@@ -9,7 +9,7 @@ object Grammar {
 
 // Lexer & Parser For The Grammar Language
 
-val KEYS = ("rule" | "enumerate" | "terminal" | "returns" | "current" | "hidden" | "abstract" | "fragment" | "ID" | "INT" | "DOUBLE" | "STRING" | "CHAR" | "grammar" | "program" | "name" | "t")
+val KEYS = ("rule" | "enumerate" | "terminal" | "abstract" | "fragment" | "ID" | "INT" | "DOUBLE" | "STRING" | "CHAR" | "grammar" | "program" | "n" | "min" | "max")
 
 val LETTER = RANGE((('a' to 'z') ++ ('A' to 'Z')).toSet)
 
@@ -185,19 +185,6 @@ case class OpParser(op: Char) extends Parser[List[Token], Char] {
 	}
 }
 
-case object SpecialParser extends Parser[List[Token], Char] {
-	def parse(tl: List[Token]) = {
-		if (tl != Nil) tl match {
-			case T_SP("\\w") :: ts => Set((' ', ts))
-			case T_SP("\\n") :: ts => Set(('\n', ts))
-			case T_SP("\\t") :: ts => Set(('\t', ts))
-			case T_SP("\\r") :: ts => Set(('\r', ts))
-			case _ => Set()
-		}
-		else Set()
-	}
-}
-
 // the abstract syntax trees for the grammar language
 
 abstract class Stmt
@@ -206,26 +193,17 @@ abstract class Elem
 
 case class Title(p: String) extends Stmt
 case class Program(id: String, exps: List[Exp]) extends Stmt
-case class Rule(id: String, exps: List[Exp], ret: String) extends Stmt
-case class Enumerate(id: String, el: List[Elem], ret: String) extends Stmt
-case class Terminal(id: String, pat: Rexp, ret: String) extends Stmt
+case class Rule(id: String, exps: List[Exp]) extends Stmt
+case class Enumerate(id: String, el: List[Elem]) extends Stmt
+case class Terminal(id: String, pat: Rexp) extends Stmt
 
 case class Keyword(s: String) extends Exp
 case class CallRule(r: String) extends Exp
 case class AltExp(e1: Exp, e2: Exp) extends Exp
-case class Name(e: Exp) extends Exp
-case class RefExp(r: String) extends Exp
 case class TypeExp(t: String) extends Exp
 case class CardiExp(e: Exp, c: Cardi) extends Exp
-case class Action(i: String) extends Exp
-
+case class SeqExp(e1: Exp, e2: Exp) extends Exp
 case object NewLine extends Exp
-case object NoSpace extends Exp
-case class AddSpace(ws: Char) extends Exp
-case class MultiSpace(ws: Char, min: Int, max: Int) extends Exp
-case object IncTab extends Exp
-case object DecTab extends Exp
-case object SameTab extends Exp
 
 case class IElem(v: Int) extends Elem // Int
 case class DElem(v: Double) extends Elem // Double
@@ -236,6 +214,9 @@ case object C_OPT extends Cardi
 case object C_PLUS extends Cardi
 case object C_STAR extends Cardi
 case object C_HID extends Cardi
+case class C_EXACT(n: Int) extends Cardi
+case class C_MIN(min: Int) extends Cardi
+case class C_MINMAX(min: Int, max: Int) extends Cardi
 
 case object CardiParser extends Parser[List[Token], Cardi] {
 	def parse(tl: List[Token]) = {
@@ -251,14 +232,14 @@ case object CardiParser extends Parser[List[Token], Cardi] {
 }
 
 lazy val Stmt: Parser[List[Token], Stmt] = {
-	(TKP(T_KEY("rule")) ~ Heading ~ BracParser('{') ~ Block ~ BracParser('}')).map[Stmt]{
-		case _ ~ hd ~ _ ~ es ~ _ => Rule(hd._1, es, hd._2)
+	(TKP(T_KEY("rule")) ~ IdParser ~ BracParser('{') ~ Block ~ BracParser('}')).map[Stmt]{
+		case _ ~ id ~ _ ~ es ~ _ => Rule(id, es)
 	} ||
-	(TKP(T_KEY("enumerate")) ~ Heading ~ BracParser('{') ~ Enum ~ BracParser('}')).map[Stmt]{
-		case _ ~ hd ~ _ ~ en ~ _ => Enumerate(hd._1, en, hd._2)
+	(TKP(T_KEY("enumerate")) ~ IdParser ~ BracParser('{') ~ Enum ~ BracParser('}')).map[Stmt]{
+		case _ ~ id ~ _ ~ en ~ _ => Enumerate(id, en)
 	} ||
-	(TKP(T_KEY("terminal")) ~ Heading ~ BracParser('{') ~ Pattern ~ BracParser('}')).map[Stmt]{
-		case _ ~ hd ~ _ ~ p ~ _ => Terminal(hd._1, p, hd._2)
+	(TKP(T_KEY("terminal")) ~ IdParser ~ BracParser('{') ~ Pattern ~ BracParser('}')).map[Stmt]{
+		case _ ~ id ~ _ ~ p ~ _ => Terminal(id, p)
 	} ||
 	(TKP(T_KEY("program")) ~ IdParser ~ BracParser('{') ~ Block ~ BracParser('}')).map[Stmt]{
 		case _ ~ id ~ _ ~ es ~ _ => Program(id, es)
@@ -268,24 +249,6 @@ lazy val Stmt: Parser[List[Token], Stmt] = {
 	}
 }
 
-lazy val Heading: Parser[List[Token], (String, String)] = {
-	(IdParser ~ TKP(T_KEY("returns")) ~ IdParser).map{
-		case id ~ _ ~ rt => (id, rt)
-	} ||
-	(IdParser).map{
-		id => (id, "")
-	}
-}
-
-/*
-lazy val Path: Parser[List[Token], String] = {
-	(IdParser ~ TKP(T_OP(".")) ~ Path).map[String]{
-		case id ~ _ ~ ps => id ++ ps
-	} ||
-	IdParser.map[String]{a => a}
-}
-*/
-
 lazy val Exp: Parser[List[Token], Exp] = {
 	(StrParser).map[Exp]{
 		case s => Keyword(s)
@@ -293,53 +256,54 @@ lazy val Exp: Parser[List[Token], Exp] = {
   (IdParser).map[Exp]{
 		case r => CallRule(r)
 	} ||
-  (BracParser('(') ~ Exp ~ BracParser(')') ~ CardiParser).map[Exp]{
+  (BracParser('(') ~ (Exp || AltDef || SeqParser) ~ BracParser(')') ~ CardiParser).map[Exp]{
 		case _ ~ e ~ _ ~ c => CardiExp(e, c)
-	} ||
-	(BracParser('[') ~ IdParser ~ BracParser(']')).map[Exp]{
-		case _ ~ r ~ _ => RefExp(r)
 	} ||
 	(TypeParser).map[Exp]{
 		case t => TypeExp(t)
 	} ||
-  (BracParser('(') ~ Exp ~ BracParser(')')).map[Exp]{
+  (BracParser('(') ~ (Exp || AltDef || SeqParser) ~ BracParser(')')).map[Exp]{
 		case _ ~ e ~ _ => e
 	}
 }
 
-lazy val Block: Parser[List[Token], List[Exp]] = {
-	((Exp || AltDef) ~ Block).map[List[Exp]]{
-		case e ~ b => e :: b
+lazy val SeqParser: Parser[List[Token], Exp] = {
+	(Exp ~ OpParser('.') ~ SeqParser).map[Exp]{
+		case e1 ~ _ ~ e2 => SeqExp(e1, e2)
 	} ||
-	(Spacing ~ Block).map[List[Exp]]{
-		case _ ~ b => NewLine :: b
-	} ||
-	(Exp || AltDef).map[List[Exp]]{
-		e => List(e)
+	(Exp ~ OpParser('.') ~ Exp).map[Exp]{
+		case e1 ~ _ ~ e2 => SeqExp(e1, e2)
 	}
 }
 
-lazy val Spacing: Parser[List[Token], Exp] = {
-	(OpParser(';')).map[Exp]{
-		_ => NewLine
+lazy val Cardinality: Parser[List[Token], Cardi] = {
+	(CardiParser) ||
+	(BracParser('{') ~ IntParser ~ BracParser('}')).map[Cardi]{
+		case _ ~ n ~ _ => C_EXACT(n)
 	} ||
-	(SpecialParser).map[Exp]{
-		c => AddSpace(c)
+	(BracParser('{') ~ IntParser ~ OpParser(',') ~ IntParser ~ BracParser('}')).map[Cardi]{
+		case _ ~ min ~ _ ~ max ~ _ => C_MINMAX(min, max)
 	} ||
-	(SpecialParser ~ BracParser('{') ~ IntParser ~ BracParser('}')).map[Exp]{
-		case c ~ _ ~ n ~ _ => MultiSpace(c, n, n)
+	(BracParser('{') ~ TKP(T_KEY("min")) ~ IntParser ~ BracParser('}')).map[Cardi]{
+		case _ ~ _ ~ min ~ _ => C_MIN(min)
 	} ||
-	(SpecialParser ~ BracParser('{') ~ IntParser ~ OpParser(',') ~ IntParser ~ BracParser('}')).map[Exp]{
-		case c ~ _ ~ min ~ _ ~ max ~ _ => MultiSpace(c, min, max)
+	(BracParser('{') ~ TKP(T_KEY("max")) ~ IntParser ~ BracParser('}')).map[Cardi]{
+		case _ ~ _ ~ max ~ _ => C_MINMAX(0, max)
+	}
+}
+
+lazy val Block: Parser[List[Token], List[Exp]] = {
+	((Exp || AltDef) ~ Block).map{
+		case e ~ b => e :: b
 	} ||
-	(TKP(T_KEY("t")) ~ OpParser('+')).map[Exp]{
-		case _ ~ _ => IncTab
+	((OpParser(';') || TKP(T_KEY("n"))) ~ Block).map{
+		case _ ~ b => NewLine :: b
 	} ||
-	(TKP(T_KEY("t")) ~ OpParser('-')).map[Exp]{
-		case _ ~ _ => DecTab
+	(Exp || AltDef).map{
+		e => List(e)
 	} ||
-	(TKP(T_KEY("t"))).map[Exp]{
-		_ => SameTab
+	(SeqParser ~ Block).map{
+		case sq ~ b => sq :: b
 	}
 }
 
@@ -393,7 +357,5 @@ def parse_tokens(tl: List[Token]) : List[Stmt] = try {
 // END OF OBJECT Grammar
 
 }
-
-// Consider adding Actions
 
 // END OF FILE Grammar.scala

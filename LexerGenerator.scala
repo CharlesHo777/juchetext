@@ -1,23 +1,15 @@
 
-
-package jucheparse
-
+// package jucheparse
 
 class LexerGenerator {
 
-
-
 	def traverse_exp(e: Grammar.Exp) : List[String] = e match {
-		case Keyword(s) => List(s)
-		case Assign(_, _, v) => traverse_exp(v)
-		case CallRule(_) => Nil
-		case AltExp(e1, e2) => traverse_exp(e1) ::: traverse_exp(e2)
-		case SeqExp(e1, e2) => traverse_exp(e1) ::: traverse_exp(e2)
-		case RefExp(_) => Nil
-		case TypeExp(_) => Nil
-		case CardiExp(e, _) => traverse_exp(e)
-		case Action(_) => Nil
-		case _ => Nil
+		case Grammar.Keyword(s) => List(s)
+		case Grammar.CallRule(_) => Nil
+		case Grammar.AltExp(e1, e2) => traverse_exp(e1) ::: traverse_exp(e2)
+		case Grammar.TypeExp(_) => Nil
+		case Grammar.CardiExp(e, _) => traverse_exp(e)
+		case Grammar.NewLine => Nil
 	}
 
 	def traverse_exps(el: List[Grammar.Exp]) : List[String] = el match {
@@ -26,19 +18,14 @@ class LexerGenerator {
 	}
 
 	def traverse_stmt(s: Grammar.Stmt) : List[String] = s match {
-		case Program(_, el) => traverse_exps(el)
-		case Rule(_, el, _) => traverse_exps(el)
-		case Enumerate(_, sl, _) => sl.map(s => s match {case SElem(_, v) => v ; case _ => ""})
-		case Terminal(_, _, _) => Nil
+		case Grammar.Program(_, el) => traverse_exps(el)
+		case Grammar.Rule(_, el, _) => traverse_exps(el)
+		case Grammar.Enumerate(_, sl, _) => sl.map(s => s match {case Grammar.SElem(_, v) => v ; case _ => ""})
+		case Grammar.Terminal(_, _, _) => Nil
 		case _ => Nil
 	}
-
-
-	// case class Modifier(component: Boolean, returns: String, hidden: List[String])
-		
 	
 	val template = LexerTemplate.get
-
 
 	def generate(ls: List[Grammar.Stmt]) : String = {
 
@@ -49,6 +36,3 @@ class LexerGenerator {
 	}
 
 }
-
-
-
