@@ -195,15 +195,20 @@ case class Title(p: String) extends Stmt
 case class Program(id: String, exps: List[Exp]) extends Stmt
 case class Rule(id: String, exps: List[Exp]) extends Stmt
 case class Enumerate(id: String, el: List[Elem]) extends Stmt
-case class Terminal(id: String, pat: Rexp) extends Stmt
+case class Terminal(id: String, pat: Rexp, priority: Int, frag: Boolean) extends Stmt {
+	def compare(t2: Terminal) : Int = {
+		val priority_2 = t2.priority
+		if (priority < priority_2) -1
+		else if (priority == priority_2) 0
+		else 1
+	}
+}
 
 case class Keyword(s: String) extends Exp
 case class CallRule(r: String) extends Exp
 case class AltExp(e1: Exp, e2: Exp) extends Exp
 case class TypeExp(t: String) extends Exp
 case class CardiExp(e: Exp, c: Cardi) extends Exp
-case class SeqExp(e1: Exp, e2: Exp) extends Exp
-case object NewLine extends Exp
 
 case class IElem(v: Int) extends Elem // Int
 case class DElem(v: Double) extends Elem // Double
@@ -238,14 +243,24 @@ lazy val Stmt: Parser[List[Token], Stmt] = {
 	(TKP(T_KEY("enumerate")) ~ IdParser ~ BracParser('{') ~ Enum ~ BracParser('}')).map[Stmt]{
 		case _ ~ id ~ _ ~ en ~ _ => Enumerate(id, en)
 	} ||
-	(TKP(T_KEY("terminal")) ~ IdParser ~ BracParser('{') ~ Pattern ~ BracParser('}')).map[Stmt]{
-		case _ ~ id ~ _ ~ p ~ _ => Terminal(id, p)
-	} ||
+	(TerminalParser) ||
 	(TKP(T_KEY("program")) ~ IdParser ~ BracParser('{') ~ Block ~ BracParser('}')).map[Stmt]{
 		case _ ~ id ~ _ ~ es ~ _ => Program(id, es)
 	} ||
 	(TKP(T_KEY("grammar")) ~ IdParser).map[Stmt]{
 		case _ ~ t => Title(t)
+	}
+}
+
+lazy val TerminalParser: Parser[List[Token], Stmt] = {
+	(TKP(T_KEY("terminal")) ~ IdParser ~ BracParser('{') ~ Pattern ~ BracParser('}')).map[Stmt]{
+		case _ ~ id ~ _ ~ p ~ _ => Terminal(id, p, 0, false)
+	} ||
+	(TKP(T_KEY("terminal")) ~ IntParser ~ IdParser ~ BracParser('{') ~ Pattern ~ BracParser('}')).map[Stmt]{
+		case _ ~ pr ~ id ~ _ ~ p ~ _ => Terminal(id, p, pr, false)
+	} ||
+	(TKP(T_KEY("terminal")) ~ TKP(T_KEY("fragment")) ~ IdParser ~ BracParser('{') ~ Pattern ~ BracParser('}')).map[Stmt]{
+		case _ ~ _ ~ id ~ _ ~ p ~ _ => Terminal(id, p, 0, true)
 	}
 }
 
@@ -256,23 +271,14 @@ lazy val Exp: Parser[List[Token], Exp] = {
   (IdParser).map[Exp]{
 		case r => CallRule(r)
 	} ||
-  (BracParser('(') ~ (Exp || AltDef || SeqParser) ~ BracParser(')') ~ CardiParser).map[Exp]{
+  (BracParser('(') ~ (Exp || AltDef) ~ BracParser(')') ~ CardiParser).map[Exp]{
 		case _ ~ e ~ _ ~ c => CardiExp(e, c)
 	} ||
 	(TypeParser).map[Exp]{
 		case t => TypeExp(t)
 	} ||
-  (BracParser('(') ~ (Exp || AltDef || SeqParser) ~ BracParser(')')).map[Exp]{
+  (BracParser('(') ~ (Exp || AltDef) ~ BracParser(')')).map[Exp]{
 		case _ ~ e ~ _ => e
-	}
-}
-
-lazy val SeqParser: Parser[List[Token], Exp] = {
-	(Exp ~ OpParser('.') ~ SeqParser).map[Exp]{
-		case e1 ~ _ ~ e2 => SeqExp(e1, e2)
-	} ||
-	(Exp ~ OpParser('.') ~ Exp).map[Exp]{
-		case e1 ~ _ ~ e2 => SeqExp(e1, e2)
 	}
 }
 
@@ -296,14 +302,8 @@ lazy val Block: Parser[List[Token], List[Exp]] = {
 	((Exp || AltDef) ~ Block).map{
 		case e ~ b => e :: b
 	} ||
-	((OpParser(';') || TKP(T_KEY("n"))) ~ Block).map{
-		case _ ~ b => NewLine :: b
-	} ||
 	(Exp || AltDef).map{
 		e => List(e)
-	} ||
-	(SeqParser ~ Block).map{
-		case sq ~ b => sq :: b
 	}
 }
 

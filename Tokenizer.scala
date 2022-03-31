@@ -6,23 +6,48 @@ abstract class Rexp
 
 case object ZERO extends Rexp
 case object ONE extends Rexp
-case class CHAR(c: Char) extends Rexp
+case class CHAR(c: Char) extends Rexp {
+	override def toString : String = {
+		s"""CHAR('${c}')"""
+	}
+}
 case class ALT(r1: Rexp, r2: Rexp) extends Rexp
 case class SEQ(r1: Rexp, r2: Rexp) extends Rexp
 case class STAR(r: Rexp) extends Rexp
 
-case class RANGE(s: Set[Char]) extends Rexp
+case class RANGE(s: Set[Char]) extends Rexp {
+	override def toString : String = {
+		val s_mod = s.map(c => s"\'${c}\'")
+		s"""RANGE(${s_mod})"""
+	}
+}
 case class PLUS(r: Rexp) extends Rexp
 case class OPT(r: Rexp) extends Rexp
 case class NTIMES(r: Rexp, n: Int) extends Rexp
 
-case class CHARSEQ(cl: List[Char]) extends Rexp
+case class CHARSEQ(cl: List[Char]) extends Rexp {
+	override def toString : String = {
+		val cl_mod = cl.map(c => s"\'${c}\'")
+		s"""CHARSEQ(${cl_mod})"""
+	}
+}
 case object ANY extends Rexp
 case class BOUND(r: Rexp, min: Int, max: Int) extends Rexp
-case class NOT(s: Set[Char]) extends Rexp
+case class NOT(s: Set[Char]) extends Rexp {
+	override def toString : String = {
+		val s_mod = s.map(c => s"\'${c}\'")
+		s"""NOT(${s_mod})"""
+	}
+}
 
 // records for extracting strings or tokens
-case class RECD(x: String, r: Rexp) extends Rexp
+case class RECD(x: String, r: Rexp) extends Rexp {
+	override def toString : String = {
+		x
+		// val x_mod = s"\"${x}\""
+		// s"""RECD(${x_mod}, ${r})"""
+	}
+}
 
 /* def RANGE takes a parameter of type collection.immutable.NumericRange[Char],
 the output value is of type Rexp and is equivalent to case class RANGE */

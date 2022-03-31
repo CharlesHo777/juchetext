@@ -268,7 +268,9 @@ lazy val Block: Parser[List[Token], Rexp] = {
 
 lazy val Reg: Parser[List[Token], Rexp] = {
 	(Block).map[Rexp]{ b => b } ||
-	(Block ~ Reg).map[Rexp]{ case b ~ bs => SEQ(b, bs) } ||
+	(Block ~ Reg).map[Rexp]{
+		case b ~ bs => SEQ(b, bs)
+	} ||
 	(BracParser('(') ~ Block ~ BracParser(')')).map[Rexp]{
 		case _ ~ b ~ _ => b
 	}
