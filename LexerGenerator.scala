@@ -1,15 +1,13 @@
 
 // package jucheparse
 
-class LexerGenerator {
+object LexerGenerator {
 
 	def traverse_exp(e: Grammar.Exp) : List[String] = e match {
 		case Grammar.Keyword(s) => List(s)
-		case Grammar.CallRule(_) => Nil
 		case Grammar.AltExp(e1, e2) => traverse_exp(e1) ::: traverse_exp(e2)
-		case Grammar.TypeExp(_) => Nil
 		case Grammar.CardiExp(e, _) => traverse_exp(e)
-		case Grammar.NewLine => Nil
+		case _ => Nil
 	}
 
 	def traverse_exps(el: List[Grammar.Exp]) : List[String] = el match {
@@ -28,13 +26,11 @@ class LexerGenerator {
 		case Nil => Nil
 	}
 
-	def traverse_stmt(s: Grammar.Stmt) : List[String] = {
-		val keys = s match {
-			case Grammar.Program(_, el) => traverse_exps(el)
-			case Grammar.Rule(_, el) => traverse_exps(el)
-			case Grammar.Enumerate(_, el) => traverse_elems(el)
-			case _ => Nil
-		}
+	def traverse_stmt(s: Grammar.Stmt) : List[String] = s match {
+		case Grammar.Program(_, el) => traverse_exps(el)
+		case Grammar.Rule(_, el) => traverse_exps(el)
+		case Grammar.Enumerate(_, el) => traverse_elems(el)
+		case _ => Nil
 	}
 
 	def string_to_rexp(s: String) : Rexp = {
@@ -42,7 +38,7 @@ class LexerGenerator {
 	}
 
 	def reg_to_rexp(reg: String) : Rexp = {
-		val r = Grammar.parse(reg)
+		val r = RegexParser.parse(reg)
 		if (r == ZERO) ONE
 		else r
 	}
@@ -61,17 +57,15 @@ class LexerGenerator {
 
 	def select_fragments(ls: List[Grammar.Terminal]) : List[Grammar.Terminal] = ls match {
 		case Nil => Nil
-		case t :: sx if (t.frag == true) {
+		case t :: sx if (t.frag == true) =>
 			t :: select_fragments(sx)
-		}
 		case t :: sx => select_fragments(sx)
 	}
 
 	def select_non_fragments(ls: List[Grammar.Terminal]) : List[Grammar.Terminal] = ls match {
 		case Nil => Nil
-		case t :: sx if (t.frag == false) {
+		case t :: sx if (t.frag == false) =>
 			t :: select_non_fragments(sx)
-		}
 		case t :: sx => select_non_fragments(sx)
 	}
 
@@ -84,14 +78,14 @@ class LexerGenerator {
 
 	def find_types_in_exps(el: List[Grammar.Exp]) : List[String] = el match {
 		case Nil => Nil
-		case TypeExp(t) :: es => t :: find_types_in_exps(es)
-		case e :: es => find_Types_in_exps(es)
+		case Grammar.TypeExp(t) :: es => t :: find_types_in_exps(es)
+		case e :: es => find_types_in_exps(es)
 	}
 	
 	def find_types_in_stmts(ls: List[Grammar.Stmt]) : List[String] = ls match {
 		case Nil => Nil
-		case Rule(_, exps) :: xs => find_types_in_exps(exps) :: find_types_in_stmts(xs)
-		case Program(_, exps) :: xs => find_types_in_exps(exps) :: find_types_in_stmts(xs)
+		case Grammar.Rule(_, exps) :: xs => find_types_in_exps(exps) ::: find_types_in_stmts(xs)
+		case Grammar.Program(_, exps) :: xs => find_types_in_exps(exps) ::: find_types_in_stmts(xs)
 	}
 
 	def build_types(sl: List[String]) : String = sl match {
@@ -133,7 +127,7 @@ class LexerGenerator {
 
 	def generate(ls: List[Grammar.Stmt]) : String = {
 		val title = ls match {
-			case t :: sx if (t.isInstanceOf[Grammar.Title]) t.p
+			case t :: sx if (t.isInstanceOf[Grammar.Title]) => t.p
 			case _ => "not_named"
 		}
 
@@ -155,29 +149,81 @@ class LexerGenerator {
 
 		val kwds_chars_reg = ("sym" $ RANGE(kwds_chars.toSet))
 
-		val types_recds = build_types_as_recd_rexp(types).mkString("", "|\n", "")
+		val types_recds = {
+			val rxds = build_types_as_recd_rexp(types)
+			if (! rxds.isEmpty) rxds.mkString("\n", "|\n", "|\n")
+			else ""
+		}
 
 		val non_fragments = select_non_fragments(terminals)
 
+		val non_fragments_cases_list = non_fragments.map[String](t => s"""case ("${t.id}", s) => T_${t.id}(s)""")
+
 		val terminal_recds_list = non_fragments.map(t => s"""("${t.id}" $$ ${t.id})""")
 
-		val terminal_recds = terminal_recds_list.mkString("", "|\n", "")
+		val terminal_recds = {
+			if (! terminal_recds_list.isEmpty) terminal_recds_list.mkString("(", "|\n", ")|\n")
+			else ""
+		}
 
 		val terminals_tokens = non_fragments.map(t => s"""case class T_${t.id}(s: String) extends Token""").mkString("", "\n", "")
+
+		val hiddens = ls.filter(s => s.isInstanceOf[Grammar.Hidden]).map[Grammar.Hidden](s => s.asInstanceOf[Grammar.Hidden])
+
+		val hidden_recds_list = hiddens.map(h => s"""("${h.id}" $$ ${h.pat})""")
+
+		val hidden_recds = {
+			if (! hidden_recds_list.isEmpty) hidden_recds_list.mkString("|\n(", "|\n", ")")
+			else ""
+		}
 
 		val define_lang : String = {
 			s"""val LANGUAGE_REG = {
 			|	STAR(
 			|		${kwds_words_reg} |
-			|		${kwds_chars_reg} |
-			|		${types_recds} |
-			|		${terminal_recds} |
-			|		("ws" $$ WHITESPACE)
+			|		${kwds_chars_reg} | ${types_recds} ${terminal_recds}
+			|		("ws" $$ WHITESPACE) ${hidden_recds}
 			|	)
 			|}"""
 		}
 
-	
+		val terminal_cases = {
+			if (! non_fragments_cases_list.isEmpty)
+				non_fragments_cases_list.mkString("", "\n", "")
+			else ""
+		}
+
+		val token_partial_function = s"""
+		|val token : PartialFunction[(String, String), Token] = {
+		|	case ("key", s) => T_KEY(s)
+		|	case ("sym", c) =>
+		|		try {T_SYM(s.head)}
+		|		catch {case e: Exception => T_SYM('?')}
+		|	case ("id", s) => T_ID(s)
+		|	case ("int", s) =>
+		|		try {T_INT(s.toInt)}
+		|		catch {case e: Exception => T_INT(0)}
+		|	case ("db", s) =>
+		|		try {T_DB(s.toDouble)}
+		|		catch {case e: Exception => T_DB(0.0)}
+		|	case ("str", s) =>
+		|		try {
+		|			val s2 = s.init.tail
+		|			val s3 = process_string(s2.toList).mkString
+		|			T_STR(s3)
+		|		} catch {
+		|			case e: Exception => T_STR("")
+		|		}
+		|	case ("char", s) =>
+		|		try {
+		|			val s2 = s.init.tail
+		|			val c = process_string(s2.toList).head
+		|			T_CHAR(c)
+		|		} catch {
+		|			case e: Exception => T_CHAR('?')
+		|		}
+		|	${terminal_cases}
+		|}"""
 
 		s"""
 		|package $title
@@ -225,11 +271,7 @@ class LexerGenerator {
 		|case Nil => Nil
 		|}
 		|
-		|
-		|
-		|
-		|
-		|
+		|${token_partial_function}
 		|
 		|def tokenize(s: String) : List[Token] = {
   	|	lex(LANGUAGE_REG, s).collect(token)

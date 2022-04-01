@@ -239,12 +239,18 @@ lazy val CharSeqReg: Parser[List[Token], Rexp] = {
 			case c :: Nil => CHAR(c)
 			case cs => CHARSEQ(cs)
 		}
+	} ||
+	(BracParser('(') ~ SpecialOp('^') ~ CharSeqParser ~ BracParser(')')).map[Rexp]{
+		case _ ~ _ ~ l ~ _ => l match {
+			case Nil => ONE
+			case cs => NOTSEQ(cs)
+		}
 	}
 }
 
 lazy val Reference: Parser[List[Token], Rexp] = {
 	(BracParser('{') ~ SpecialOp('$') ~ IdParser ~ BracParser('}')).map[Rexp]{
-		case _ ~ _ ~ cs ~ _ => (cs.mkString $ ONE)
+		case _ ~ _ ~ cs ~ _ => MARK(cs.mkString)
 	}
 }
 

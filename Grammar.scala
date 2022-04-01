@@ -9,7 +9,7 @@ object Grammar {
 
 // Lexer & Parser For The Grammar Language
 
-val KEYS = ("rule" | "enumerate" | "terminal" | "abstract" | "fragment" | "ID" | "INT" | "DOUBLE" | "STRING" | "CHAR" | "grammar" | "program" | "n" | "min" | "max")
+val KEYS = ("rule" | "enumerate" | "terminal" | "abstract" | "fragment" | "ID" | "INT" | "DOUBLE" | "STRING" | "CHAR" | "grammar" | "program" | "ignore" | "min" | "max")
 
 val LETTER = RANGE((('a' to 'z') ++ ('A' to 'Z')).toSet)
 
@@ -204,6 +204,8 @@ case class Terminal(id: String, pat: Rexp, priority: Int, frag: Boolean) extends
 	}
 }
 
+case class Hidden(id: String, pat: Rexp) extends Stmt
+
 case class Keyword(s: String) extends Exp
 case class CallRule(r: String) extends Exp
 case class AltExp(e1: Exp, e2: Exp) extends Exp
@@ -218,7 +220,6 @@ abstract class Cardi
 case object C_OPT extends Cardi
 case object C_PLUS extends Cardi
 case object C_STAR extends Cardi
-case object C_HID extends Cardi
 case class C_EXACT(n: Int) extends Cardi
 case class C_MIN(min: Int) extends Cardi
 case class C_MINMAX(min: Int, max: Int) extends Cardi
@@ -229,7 +230,6 @@ case object CardiParser extends Parser[List[Token], Cardi] {
 			case T_OP('*') :: ts => Set((C_OPT, ts))
 			case T_OP('+') :: ts => Set((C_PLUS, ts))
 			case T_OP('?') :: ts => Set((C_STAR, ts))
-			case T_OP('/') :: ts => Set((C_HID, ts))
 			case _ => Set()
 		}
 		else Set()
@@ -261,6 +261,9 @@ lazy val TerminalParser: Parser[List[Token], Stmt] = {
 	} ||
 	(TKP(T_KEY("terminal")) ~ TKP(T_KEY("fragment")) ~ IdParser ~ BracParser('{') ~ Pattern ~ BracParser('}')).map[Stmt]{
 		case _ ~ _ ~ id ~ _ ~ p ~ _ => Terminal(id, p, 0, true)
+	} ||
+	(OpParser('@') ~ TKP(T_KEY("ignore")) ~ TKP(T_KEY("terminal")) ~ IdParser ~ BracParser('{') ~ Pattern ~ BracParser('}')).map[Stmt]{
+		case _ ~ _ ~ _ ~ id ~ _ ~ p ~ _ => Hidden(id, p)
 	}
 }
 

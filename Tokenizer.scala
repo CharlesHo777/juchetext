@@ -39,13 +39,24 @@ case class NOT(s: Set[Char]) extends Rexp {
 		s"""NOT(${s_mod})"""
 	}
 }
+case class NOTSEQ(cl: List[Char]) extends Rexp {
+	override def toString : String = {
+		val cl_mod = cl.map(c => s"\'${c}\'")
+		s"""NOTSEQ(${cl_mod})"""
+	}
+}
 
 // records for extracting strings or tokens
 case class RECD(x: String, r: Rexp) extends Rexp {
 	override def toString : String = {
-		x
-		// val x_mod = s"\"${x}\""
-		// s"""RECD(${x_mod}, ${r})"""
+		val x_mod = s"\"${x}\""
+		s"""RECD(${x_mod}, ${r})"""
+	}
+}
+
+case class MARK(s: String) extends Rexp {
+	override def toString : String = {
+		s
 	}
 }
 
@@ -78,6 +89,7 @@ case class ChrSq(cl: List[Char]) extends Val
 case class AnyChar(c: Char) extends Val
 case class Bounded(vs: List[Val], n: Int) extends Val
 case class Nein(c: Char) extends Val
+case class NeinSq(cl: List[Char]) extends Val
 
 abstract class Token 
 
@@ -146,6 +158,9 @@ def nullable(r: Rexp) : Boolean = r match {
 		else false
 	}
 	case NOT(_) => false
+	case NOTSEQ(cl) => false
+
+	case MARK(_) => true
 	
 	case RECD(_, r1) => nullable(r1)
 }
@@ -175,6 +190,13 @@ def der(c: Char, r: Rexp) : Rexp = r match {
 		case e :: Nil => der(c, CHAR(e))
 		case e :: es => if (e == c) CHARSEQ(es) else ZERO
 	}
+	case NOTSEQ(cl) => cl match {
+		case Nil => ZERO
+		case e :: Nil =>
+			if (e == c) ZERO
+			else ONE
+		case e :: es => if (e != c) NOTSEQ(es) else ZERO
+	}
 	case ANY => ONE
 	case BOUND(r, min, max) => {
 		if (min > 0 && max >= min)
@@ -186,6 +208,8 @@ def der(c: Char, r: Rexp) : Rexp = r match {
 		else ZERO
 	}
 	case NOT(charSet) => if (charSet.contains(c)) ZERO else ONE
+
+	case MARK(_) => ZERO
 
 	case RECD(_, r1) => der(c, r1)
 }
@@ -209,6 +233,7 @@ def flatten(v: Val) : String = v match {
 	case AnyChar(c) => c.toString
 	case Bounded(vs, n) => vs.map(flatten).mkString
 	case Nein(c) => c.toString
+	case NeinSq(cl) => cl.mkString
 	
 	case Rec(_, v) => flatten(v)
 
@@ -219,22 +244,15 @@ def flatten(v: Val) : String = v match {
 // used for tokenising a string
 def env(v: Val) : List[(String, String)] = v match {
 
-	case Empty => Nil
-	case Chr(c) => Nil
 	case Left(vx) => env(vx)
 	case Right(vx) => env(vx)
 	case Sequ(v1, v2) => env(v1) ::: env(v2)
 	case Stars(vs) => vs.flatMap(env)
 	
-	case Ranged(c) => Nil
 	case More(vx, stars) => env(vx) ::: env(stars)
 	case Opted(vx) => env(vx)
 	case Exact(vs, n) => vs.flatMap(env)
-
-	case ChrSq(cl) => Nil
-	case AnyChar(c) => Nil
 	case Bounded(vs, n) => vs.flatMap(env)
-	case Nein(c) => Nil
 
 	case Rec(x, vx) => (x, flatten(vx))::env(vx)
 
@@ -272,7 +290,9 @@ def mkeps(r: Rexp) : Val = r match {
 		else throw new Exception("mkeps() error, Rexp not nullable")
 	}
 
-	 // case NOT(_) => throw new Exception("The reg exp NOT(s: Set[Char]) is not nullable.")
+	// case NOT(_) => throw new Exception("The reg exp NOT(s: Set[Char]) is not nullable.")
+
+	case MARK(_) => Empty
 
 	case RECD(x, reg) => Rec(x, mkeps(reg))
 	case _ => throw new Exception("mkeps() error, Rexp not nullable")
@@ -289,7 +309,9 @@ def inj(r: Rexp, c: Char, v: Val) : Val = (r, v) match {
 
 	case (CHARSEQ(lr), Empty) => ChrSq(List(c))
 	case (CHARSEQ(lr), ChrSq(lv)) if (! lv.isEmpty) => ChrSq(c :: lv)
-
+	case (NOTSEQ(lr), Empty) => NeinSq(List(c))
+	case (NOTSEQ(lr), NeinSq(lv)) if (! lv.isEmpty) => NeinSq(c :: lv)
+	
 	case (CHAR(d), Empty) => Chr(c)
 	case (RANGE(charSet), Empty) => Ranged(c)
 	case (PLUS(reg), Sequ(v1, Stars(l))) => More(inj(reg, c, v1), Stars(l))
