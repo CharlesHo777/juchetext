@@ -2,7 +2,7 @@
 grammar dprk
 
 program Robots {
-	(Message)*;
+	(Message)*
 	(Move)*
 }
 
@@ -19,7 +19,7 @@ enumerate Greeting {
 }
 
 rule Ritual {
-	"say" "out" Greeting;
+	"say" "out" Greeting
 	"go" "forward" INT "meters"
 }
 

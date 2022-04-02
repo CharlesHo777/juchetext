@@ -7,6 +7,7 @@ object LexerGenerator {
 		case Grammar.Keyword(s) => List(s)
 		case Grammar.AltExp(e1, e2) => traverse_exp(e1) ::: traverse_exp(e2)
 		case Grammar.CardiExp(e, _) => traverse_exp(e)
+		case Grammar.SeqExp(es) => traverse_exps(es)
 		case _ => Nil
 	}
 
@@ -19,6 +20,7 @@ object LexerGenerator {
 		case Grammar.SElem(s) => s
 		case Grammar.IElem(n) => n.toString
 		case Grammar.DElem(d) => d.toString
+		case _ => ""
 	}
 
 	def traverse_elems(el: List[Grammar.Elem]) : List[String] = el match {
@@ -33,20 +35,16 @@ object LexerGenerator {
 		case _ => Nil
 	}
 
-	def string_to_rexp(s: String) : Rexp = {
-		CHARSEQ(s.toList)
-	}
-
 	def reg_to_rexp(reg: String) : Rexp = {
 		val r = RegexParser.parse(reg)
 		if (r == ZERO) ONE
 		else r
 	}
 
-	def build_alt_keys(xs: List[String]) : Rexp = xs match {
-		case Nil => ZERO
-		case k :: Nil => string_to_rexp(k)
-		case k :: ks => ALT(string_to_rexp(k), build_alt_keys(ks))
+	def build_alt_keys(xs: List[String]) : String = xs match {
+		case Nil => "ZERO"
+		case k :: Nil => s""""${k}""""
+		case k :: ks => s""""${k}" | ${build_alt_keys(ks)}"""
 	}
 
 	def stmts_to_terminals(ls: List[Grammar.Stmt]) : List[Grammar.Terminal] = ls match {
@@ -70,6 +68,7 @@ object LexerGenerator {
 	}
 
 	def terminals_def_as_string(tl: List[Grammar.Terminal]) : String = tl match {
+		case Nil => ""
 		case t :: ts => {
 			s"""val ${t.id} = ${t.pat}
 			|""".stripMargin ++ terminals_def_as_string(ts)
@@ -86,6 +85,7 @@ object LexerGenerator {
 		case Nil => Nil
 		case Grammar.Rule(_, exps) :: xs => find_types_in_exps(exps) ::: find_types_in_stmts(xs)
 		case Grammar.Program(_, exps) :: xs => find_types_in_exps(exps) ::: find_types_in_stmts(xs)
+		case s :: xs => find_types_in_stmts(xs)
 	}
 
 	def build_types(sl: List[String]) : String = sl match {
@@ -127,7 +127,7 @@ object LexerGenerator {
 
 	def generate(ls: List[Grammar.Stmt]) : String = {
 		val title = ls match {
-			case t :: sx if (t.isInstanceOf[Grammar.Title]) => t.p
+			case t :: sx if (t.isInstanceOf[Grammar.Title]) => t.asInstanceOf[Grammar.Title].p
 			case _ => "not_named"
 		}
 
@@ -145,9 +145,15 @@ object LexerGenerator {
 
 		val kwds_chars = kwds.filter(k => k.size == 1)
 
-		val kwds_words_reg = ("key" $ build_alt_keys(kwds))
+		val kwds_words_reg = s"""("key" $$ ${build_alt_keys(kwds)})"""
 
-		val kwds_chars_reg = ("sym" $ RANGE(kwds_chars.toSet))
+		def print_chars(sc: List[String]) : String = sc match {
+			case Nil => ""
+			case s :: Nil => s"\'${s}\'"
+			case s :: sx => s"\'${s}\', " ++ print_chars(sx)
+		}
+
+		val kwds_chars_reg = s"""("sym" $$ RANGE(Set[Char](${print_chars(kwds_chars)})))"""
 
 		val types_recds = {
 			val rxds = build_types_as_recd_rexp(types)
@@ -193,7 +199,7 @@ object LexerGenerator {
 			else ""
 		}
 
-		val token_partial_function = s"""
+		val token_partial_function = """
 		|val token : PartialFunction[(String, String), Token] = {
 		|	case ("key", s) => T_KEY(s)
 		|	case ("sym", c) =>
@@ -225,7 +231,7 @@ object LexerGenerator {
 		|	${terminal_cases}
 		|}"""
 
-		s"""
+		"""
 		|package $title
 		|
 		|$template
@@ -258,7 +264,7 @@ object LexerGenerator {
 		|case class T_STR(s: String) extends Token
 		|case class T_CHAR(c: Char) extends Token
 		|
-		|${terminal_tokens}
+		|${terminals_tokens}
 		|
 		|def process_string(s: List[Char]) : List[Char] = s match {
 		|case '\\' :: '\\' :: cs => '\\' :: process_string(cs)

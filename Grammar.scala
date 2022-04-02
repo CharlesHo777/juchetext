@@ -9,7 +9,7 @@ object Grammar {
 
 // Lexer & Parser For The Grammar Language
 
-val KEYS = ("rule" | "enumerate" | "terminal" | "abstract" | "fragment" | "ID" | "INT" | "DOUBLE" | "STRING" | "CHAR" | "grammar" | "program" | "ignore" | "min" | "max")
+val KEYS = ("rule" | "enumerate" | "terminal" | "fragment" | "ID" | "INT" | "DOUBLE" | "STRING" | "CHAR" | "grammar" | "program" | "ignore" | "min" | "max")
 
 val LETTER = RANGE((('a' to 'z') ++ ('A' to 'Z')).toSet)
 
@@ -211,6 +211,7 @@ case class CallRule(r: String) extends Exp
 case class AltExp(e1: Exp, e2: Exp) extends Exp
 case class TypeExp(t: String) extends Exp
 case class CardiExp(e: Exp, c: Cardi) extends Exp
+case class SeqExp(es: List[Exp]) extends Exp
 
 case class IElem(v: Int) extends Elem // Int
 case class DElem(v: Double) extends Elem // Double
@@ -274,14 +275,18 @@ lazy val Exp: Parser[List[Token], Exp] = {
   (IdParser).map[Exp]{
 		case r => CallRule(r)
 	} ||
-  (BracParser('(') ~ (Exp || AltDef) ~ BracParser(')') ~ CardiParser).map[Exp]{
-		case _ ~ e ~ _ ~ c => CardiExp(e, c)
+  (BracParser('(') ~ (Block) ~ BracParser(')') ~ Cardinality).map[Exp]{
+		case _ ~ es ~ _ ~ c =>
+			if (es.size == 1) CardiExp(es.head, c)
+			else CardiExp(SeqExp(es), c)
 	} ||
 	(TypeParser).map[Exp]{
 		case t => TypeExp(t)
 	} ||
-  (BracParser('(') ~ (Exp || AltDef) ~ BracParser(')')).map[Exp]{
-		case _ ~ e ~ _ => e
+  (BracParser('(') ~ (Block) ~ BracParser(')')).map[Exp]{
+		case _ ~ es ~ _ =>
+			if (es.size == 1) es.head
+			else SeqExp(es)
 	}
 }
 

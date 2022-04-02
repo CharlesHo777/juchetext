@@ -7,13 +7,13 @@ val LETTER = RANGE((('a' to 'z') ++ ('A' to 'Z')).toSet)
 
 val NUMBER = RANGE('0' to '9')
 
-val OP = RANGE(Set('_', '-', '/', '%', '=', ',', '.', ':', ';', '>', '<', '~', '!', '&', '#', '`', '@'))
+val OP = RANGE(Set('_', '/', '%', '=', ',', '.', ':', ';', '>', '<', '~', '!', '&', '#', '`', '@'))
 
 val QUOTE = RANGE(Set('\"', '\''))
 
 val BRACKET = RANGE(Set('(', ')', '{', '}', '[', ']'))
 
-val SPECIAL = RANGE(Set('\\', '*', '+', '|', '?', '$', '^'))
+val SPECIAL = RANGE(Set('\\', '*', '+', '-', '|', '?', '$', '^'))
 
 val SYMBOL = (OP | BRACKET | SPECIAL)
 
@@ -187,8 +187,23 @@ lazy val Cluster: Parser[List[Token], Rexp] = {
 }
 
 lazy val BracBlock: Parser[List[Token], Rexp] = {
-	(BracParser('[') ~ CharSeqParser ~ BracParser(']')).map[Rexp]{ case _ ~ l ~ _ => RANGE(l.toSet) } ||
-	(BracParser('[') ~ SpecialOp('^') ~ CharSeqParser ~ BracParser(']')).map[Rexp]{ case _ ~ _ ~ l ~ _ => NOT(l.toSet) }
+	(BracParser('[') ~ BracContent ~ BracParser(']')).map[Rexp]{ case _ ~ s ~ _ => RANGE(s) } ||
+	(BracParser('[') ~ SpecialOp('^') ~ BracContent ~ BracParser(']')).map[Rexp]{ case _ ~ _ ~ s ~ _ => NOT(s) }
+}
+
+lazy val BracContent: Parser[List[Token], Set[Char]] = {
+	((CharSeqParser || RangeParser) ~ BracContent).map{
+		case l ~ s => l.toSet ++ s
+	} ||
+	(CharSeqParser || RangeParser).map{
+		case l => l.toSet
+	}
+}
+
+lazy val RangeParser: Parser[List[Token], List[Char]] = {
+	(BracParser('(') ~ CharParser ~ SpecialOp('-') ~ CharParser ~ BracParser(')')).map{
+		case _ ~ c1 ~ _ ~ c2 ~ _ => (c1 to c2).toList
+	}
 }
 
 lazy val MinMaxBlock: Parser[List[Token], Rexp] = {
