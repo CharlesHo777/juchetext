@@ -231,21 +231,25 @@ object LexerGenerator {
 		|	${terminal_cases}
 		|}"""
 
-		"""
-		|package $title
+		// Below is the return value
+
+		s"""
+		|package ${title}
 		|
-		|$template
+		|${template}
+		|
+		|object ${title}Parser {
 		|
 		|val LETTER = RANGE((('a' to 'z') ++ ('A' to 'Z')).toSet)
 		|
 		|val NUMBER = RANGE('0' to '9')
 		|
-		|val WHITESPACE = PLUS(" " | "\n" | "\t" | "\r")
+		|val WHITESPACE = PLUS(" " | "\\n" | "\\t" | "\\r")
 		|
 		|val SYMBOL = (
 		|	LETTER | NUMBER |
 		|	RANGE(Set('+', '-', '*', '/', '%', '=', '>', '<', '.', '_', ',', ';', ':', '!', '?', '|', '&', '~','$$', '#', '^', '`', '@', '(', ')', '{', '}', '[', ']', ' ')) |
-		|	(CHAR('\\') ~ RANGE(Set('\\', '\"', '\'', 'n', 't', 'r')))
+		|	(CHAR('\\\\') ~ RANGE(Set('\\\\', '\\"', '\\'', 'n', 't', 'r')))
 		|)
 		|
 		|${types_def}
@@ -267,12 +271,12 @@ object LexerGenerator {
 		|${terminals_tokens}
 		|
 		|def process_string(s: List[Char]) : List[Char] = s match {
-		|case '\\' :: '\\' :: cs => '\\' :: process_string(cs)
-		|case '\\' :: '\"' :: cs => '\"' :: process_string(cs)
-		|case '\\' :: '\'' :: cs => '\'' :: process_string(cs)
-		|case '\\' :: 'n' :: cs => '\n' :: process_string(cs)
-		|case '\\' :: 't' :: cs => '\t' :: process_string(cs)
-		|case '\\' :: 'r' :: cs => '\r' :: process_string(cs)
+		|case '\\\\' :: '\\\\' :: cs => '\\' :: process_string(cs)
+		|case '\\\\' :: '\\\"' :: cs => '\\\"' :: process_string(cs)
+		|case '\\\\' :: '\\\'' :: cs => '\\\'' :: process_string(cs)
+		|case '\\\\' :: 'n' :: cs => '\\n' :: process_string(cs)
+		|case '\\\\' :: 't' :: cs => '\\t' :: process_string(cs)
+		|case '\\\\' :: 'r' :: cs => '\\r' :: process_string(cs)
 		|case c :: cs => c :: process_string(cs)
 		|case Nil => Nil
 		|}
@@ -281,6 +285,8 @@ object LexerGenerator {
 		|
 		|def tokenize(s: String) : List[Token] = {
   	|	lex(LANGUAGE_REG, s).collect(token)
+		|}
+		|
 		|}
 		|
 		""".stripMargin

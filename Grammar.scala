@@ -206,6 +206,7 @@ case class Terminal(id: String, pat: Rexp, priority: Int, frag: Boolean) extends
 
 case class Hidden(id: String, pat: Rexp) extends Stmt
 
+case class Assign(id: String, op: Char, v: Exp) extends Exp
 case class Keyword(s: String) extends Exp
 case class CallRule(r: String) extends Exp
 case class AltExp(e1: Exp, e2: Exp) extends Exp
@@ -307,11 +308,23 @@ lazy val Cardinality: Parser[List[Token], Cardi] = {
 }
 
 lazy val Block: Parser[List[Token], List[Exp]] = {
-	((Exp || AltDef) ~ Block).map{
+	((Exp || AssignParser || AltDef) ~ Block).map{
 		case e ~ b => e :: b
 	} ||
-	(Exp || AltDef).map{
+	(Exp || AssignParser ||AltDef).map{
 		e => List(e)
+	}
+}
+
+lazy val AssignParser: Parser[List[Token], Exp] = {
+	(IdParser ~ OpParser('=') ~ Exp).map[Exp]{
+		case id ~ _ ~ e => Assign(id, '=', e)
+	} ||
+	(IdParser ~ OpParser('+') ~ OpParser('=') ~ Exp).map[Exp]{
+		case id ~ _ ~ _ ~ e => assign(id, '+', e)
+	} ||
+	(IdParser ~ OpParser('+') ~ OpParser('+') ~ OpParser('=') ~ Exp).map[Exp]{
+		case id ~ _ ~ _ ~ _ ~ e => Assign(id, '&', e)
 	}
 }
 
