@@ -16,15 +16,8 @@ object LexerGenerator {
 		case Nil => Nil
 	}
 
-	def traverse_elem(e: Grammar.Elem) : String = e match {
-		case Grammar.SElem(s) => s
-		case Grammar.IElem(n) => n.toString
-		case Grammar.DElem(d) => d.toString
-		case _ => ""
-	}
-
 	def traverse_elems(el: List[Grammar.Elem]) : List[String] = el match {
-		case e :: es => traverse_elem(e) :: traverse_elems(es)
+		case e :: es => e.s :: traverse_elems(es)
 		case Nil => Nil
 	}
 
@@ -238,7 +231,7 @@ object LexerGenerator {
 		|
 		|${template}
 		|
-		|object ${title}Parser {
+		|object ${title}Tokenizer {
 		|
 		|val LETTER = RANGE((('a' to 'z') ++ ('A' to 'Z')).toSet)
 		|

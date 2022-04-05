@@ -189,7 +189,6 @@ case class OpParser(op: Char) extends Parser[List[Token], Char] {
 
 abstract class Stmt
 abstract class Exp
-abstract class Elem
 
 case class Title(p: String) extends Stmt
 case class Program(id: String, exps: List[Exp]) extends Stmt
@@ -206,7 +205,7 @@ case class Terminal(id: String, pat: Rexp, priority: Int, frag: Boolean) extends
 
 case class Hidden(id: String, pat: Rexp) extends Stmt
 
-case class Assign(id: String, op: Char, v: Exp) extends Exp
+case class Assign(e: Exp) extends Exp
 case class Keyword(s: String) extends Exp
 case class CallRule(r: String) extends Exp
 case class AltExp(e1: Exp, e2: Exp) extends Exp
@@ -214,17 +213,15 @@ case class TypeExp(t: String) extends Exp
 case class CardiExp(e: Exp, c: Cardi) extends Exp
 case class SeqExp(es: List[Exp]) extends Exp
 
-case class IElem(v: Int) extends Elem // Int
-case class DElem(v: Double) extends Elem // Double
-case class SElem(v: String) extends Elem // String
+case class Elem(s: String) extends Exp
 
 abstract class Cardi
 case object C_OPT extends Cardi
 case object C_PLUS extends Cardi
 case object C_STAR extends Cardi
-case class C_EXACT(n: Int) extends Cardi
-case class C_MIN(min: Int) extends Cardi
-case class C_MINMAX(min: Int, max: Int) extends Cardi
+//case class C_EXACT(n: Int) extends Cardi
+//case class C_MIN(min: Int) extends Cardi
+//case class C_MINMAX(min: Int, max: Int) extends Cardi
 
 case object CardiParser extends Parser[List[Token], Cardi] {
 	def parse(tl: List[Token]) = {
@@ -270,13 +267,16 @@ lazy val TerminalParser: Parser[List[Token], Stmt] = {
 }
 
 lazy val Exp: Parser[List[Token], Exp] = {
+	(OpParser('$') ~ Exp).map[Exp]{
+		case _ ~ e => Assign(e)
+	}
 	(StrParser).map[Exp]{
 		case s => Keyword(s)
 	} ||
   (IdParser).map[Exp]{
 		case r => CallRule(r)
 	} ||
-  (BracParser('(') ~ (Block) ~ BracParser(')') ~ Cardinality).map[Exp]{
+  (BracParser('(') ~ Block ~ BracParser(')') ~ Cardinality).map[Exp]{
 		case _ ~ es ~ _ ~ c =>
 			if (es.size == 1) CardiExp(es.head, c)
 			else CardiExp(SeqExp(es), c)
@@ -284,13 +284,14 @@ lazy val Exp: Parser[List[Token], Exp] = {
 	(TypeParser).map[Exp]{
 		case t => TypeExp(t)
 	} ||
-  (BracParser('(') ~ (Block) ~ BracParser(')')).map[Exp]{
+  (BracParser('(') ~ Block ~ BracParser(')')).map[Exp]{
 		case _ ~ es ~ _ =>
 			if (es.size == 1) es.head
 			else SeqExp(es)
 	}
 }
 
+/*
 lazy val Cardinality: Parser[List[Token], Cardi] = {
 	(CardiParser) ||
 	(BracParser('{') ~ IntParser ~ BracParser('}')).map[Cardi]{
@@ -306,25 +307,14 @@ lazy val Cardinality: Parser[List[Token], Cardi] = {
 		case _ ~ _ ~ max ~ _ => C_MINMAX(0, max)
 	}
 }
+*/
 
 lazy val Block: Parser[List[Token], List[Exp]] = {
-	((Exp || AssignParser || AltDef) ~ Block).map{
+	((Exp || AltDef) ~ Block).map{
 		case e ~ b => e :: b
 	} ||
-	(Exp || AssignParser ||AltDef).map{
+	(Exp || AltDef).map{
 		e => List(e)
-	}
-}
-
-lazy val AssignParser: Parser[List[Token], Exp] = {
-	(IdParser ~ OpParser('=') ~ Exp).map[Exp]{
-		case id ~ _ ~ e => Assign(id, '=', e)
-	} ||
-	(IdParser ~ OpParser('+') ~ OpParser('=') ~ Exp).map[Exp]{
-		case id ~ _ ~ _ ~ e => assign(id, '+', e)
-	} ||
-	(IdParser ~ OpParser('+') ~ OpParser('+') ~ OpParser('=') ~ Exp).map[Exp]{
-		case id ~ _ ~ _ ~ _ ~ e => Assign(id, '&', e)
 	}
 }
 
@@ -336,16 +326,14 @@ lazy val AltDef: Parser[List[Token], Exp] = {
 }
 
 lazy val Enum: Parser[List[Token], List[Elem]] = {
-	(Elem ~ OpParser('|') ~ Enum).map{
+	(ElemParser ~ OpParser('|') ~ Enum).map{
 		case e ~ _ ~ en => e :: en
 	} ||
-	Elem.map{e => List(e)}
+	ElemParser.map{e => List(e)}
 }
 
-lazy val Elem: Parser[List[Token], Elem] = {
-  (StrParser || IdParser).map[Elem]{s => SElem(s)} ||
-	(IntParser).map[Elem]{n => IElem(n)} ||
-	(DoubleParser).map[Elem]{d => DElem(d)}
+lazy val ElemParser: Parser[List[Token], Elem] = {
+  (StrParser || IdParser).map[Elem]{s => Elem(s)}
 }
 
 lazy val Pattern: Parser[List[Token], Rexp] = {
