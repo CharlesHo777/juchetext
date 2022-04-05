@@ -1,4 +1,6 @@
 
+// START OF FILE ParserGenerator.scala
+
 // package jucheparse
 
 object ParserGenerator {
@@ -201,11 +203,15 @@ val title = ls match {
 	case _ => "not_named"
 }
 
+val template = ParserGenerator.get
+
 s"""
 
 package ${title}
 
 object ${title}Parser {
+
+${template}
 
 case class TKP(t: Token) extends Parser[List[Token], Node] {
 	def parse(in: List[Token]) = {
@@ -344,3 +350,5 @@ ${ls.map(build_stmt_parser).mkString("", "", "")}
 }
 
 }
+
+// END OF FILE ParserGenerator.scala

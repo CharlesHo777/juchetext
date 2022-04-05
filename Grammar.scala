@@ -1,4 +1,6 @@
 
+// START OF FILE Grammar.scala
+
 // package jucheparse
 
 /*
@@ -269,14 +271,14 @@ lazy val TerminalParser: Parser[List[Token], Stmt] = {
 lazy val Exp: Parser[List[Token], Exp] = {
 	(OpParser('$') ~ Exp).map[Exp]{
 		case _ ~ e => Assign(e)
-	}
+	} ||
 	(StrParser).map[Exp]{
 		case s => Keyword(s)
 	} ||
   (IdParser).map[Exp]{
 		case r => CallRule(r)
 	} ||
-  (BracParser('(') ~ Block ~ BracParser(')') ~ Cardinality).map[Exp]{
+  (BracParser('(') ~ Block ~ BracParser(')') ~ CardiParser).map[Exp]{
 		case _ ~ es ~ _ ~ c =>
 			if (es.size == 1) CardiExp(es.head, c)
 			else CardiExp(SeqExp(es), c)

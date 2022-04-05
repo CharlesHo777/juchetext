@@ -1,9 +1,12 @@
 
+// START OF FILE LexerGenerator.scala
+
 // package jucheparse
 
 object LexerGenerator {
 
 	def traverse_exp(e: Grammar.Exp) : List[String] = e match {
+		case Grammar.Assign(e) => traverse_exp(e)
 		case Grammar.Keyword(s) => List(s)
 		case Grammar.AltExp(e1, e2) => traverse_exp(e1) ::: traverse_exp(e2)
 		case Grammar.CardiExp(e, _) => traverse_exp(e)
@@ -71,6 +74,7 @@ object LexerGenerator {
 	def find_types_in_exps(el: List[Grammar.Exp]) : List[String] = el match {
 		case Nil => Nil
 		case Grammar.TypeExp(t) :: es => t :: find_types_in_exps(es)
+		case Grammar.Assign(e) :: es => find_types_in_exps(List[Grammar.Exp](e)) ::: find_types_in_exps(es)
 		case e :: es => find_types_in_exps(es)
 	}
 	
@@ -118,7 +122,10 @@ object LexerGenerator {
 
 	val template = LexerTemplate.get
 
-	def generate(ls: List[Grammar.Stmt]) : String = {
+	def generate(source: String) : String = {
+
+		val ls = Grammar.parse(source)
+
 		val title = ls match {
 			case t :: sx if (t.isInstanceOf[Grammar.Title]) => t.asInstanceOf[Grammar.Title].p
 			case _ => "not_named"
@@ -126,11 +133,11 @@ object LexerGenerator {
 
 		val types = find_types_in_stmts(ls)
 
-		val types_def = build_types(types)
+		val types_def = build_types(types.distinct)
 
 		val terminals = stmts_to_terminals(ls)
 
-		val terminals_def = terminals_def_as_string(terminals)
+		val terminals_def = terminals_def_as_string(terminals.distinct)
 
 		val kwds = ls.flatMap(traverse_stmt).distinct
 
@@ -149,19 +156,19 @@ object LexerGenerator {
 		val kwds_chars_reg = s"""("sym" $$ RANGE(Set[Char](${print_chars(kwds_chars)})))"""
 
 		val types_recds = {
-			val rxds = build_types_as_recd_rexp(types)
+			val rxds = build_types_as_recd_rexp(types.distinct)
 			if (! rxds.isEmpty) rxds.mkString("\n", "|\n", "|\n")
 			else ""
 		}
 
-		val non_fragments = select_non_fragments(terminals)
+		val non_fragments = select_non_fragments(terminals).distinct
 
 		val non_fragments_cases_list = non_fragments.map[String](t => s"""case ("${t.id}", s) => T_${t.id}(s)""")
 
 		val terminal_recds_list = non_fragments.map(t => s"""("${t.id}" $$ ${t.id})""")
 
 		val terminal_recds = {
-			if (! terminal_recds_list.isEmpty) terminal_recds_list.mkString("(", "|\n", ")|\n")
+			if (! terminal_recds_list.isEmpty) terminal_recds_list.mkString("", "|\n", "|")
 			else ""
 		}
 
@@ -192,10 +199,10 @@ object LexerGenerator {
 			else ""
 		}
 
-		val token_partial_function = """
+		val token_partial_function = s"""
 		|val token : PartialFunction[(String, String), Token] = {
 		|	case ("key", s) => T_KEY(s)
-		|	case ("sym", c) =>
+		|	case ("sym", s) =>
 		|		try {T_SYM(s.head)}
 		|		catch {case e: Exception => T_SYM('?')}
 		|	case ("id", s) => T_ID(s)
@@ -254,7 +261,7 @@ object LexerGenerator {
 		|abstract class Token
 		|
 		|case class T_KEY(s: String) extends Token
-		|case class T_SYMBOL(c: Char) extends Token
+		|case class T_SYM(c: Char) extends Token
 		|case class T_ID(s: String) extends Token
 		|case class T_INT(n: Int) extends Token
 		|case class T_DB(d: Double) extends Token
@@ -264,7 +271,7 @@ object LexerGenerator {
 		|${terminals_tokens}
 		|
 		|def process_string(s: List[Char]) : List[Char] = s match {
-		|case '\\\\' :: '\\\\' :: cs => '\\' :: process_string(cs)
+		|case '\\\\' :: '\\\\' :: cs => '\\\\' :: process_string(cs)
 		|case '\\\\' :: '\\\"' :: cs => '\\\"' :: process_string(cs)
 		|case '\\\\' :: '\\\'' :: cs => '\\\'' :: process_string(cs)
 		|case '\\\\' :: 'n' :: cs => '\\n' :: process_string(cs)
@@ -286,3 +293,5 @@ object LexerGenerator {
 	}
 
 }
+
+// END OF FILE LexerGenerator.scala

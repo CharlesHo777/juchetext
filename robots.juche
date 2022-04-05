@@ -2,12 +2,12 @@
 grammar dprk
 
 program Robots {
-	(Message)*
-	(Move)*
+	$(Message)*
+	$(Move)*
 }
 
 rule Message {
-	Greeting | Direction | Alarm
+	$ (Greeting | Direction | Alarm)
 }
 
 terminal Regger {
@@ -19,28 +19,28 @@ enumerate Greeting {
 }
 
 rule Ritual {
-	"say" "out" Greeting
-	"go" "forward" INT "meters"
+	"say" "out" $Greeting
+	"go" "forward" $INT "meters"
 }
 
 rule Move {
-	Forward | Backward | Left | Right
+	$(Forward | Backward | Left | Right)
 }
 
 rule Forward {
-	"go" "forward" INT "meters"
+	"go" "forward" $INT "meters"
 }
 
 rule Backward {
-	"go" "backward" INT "meters"
+	"go" "backward" $INT "meters"
 }
 
 rule Left {
-	"go" "left" INT "meters"
+	"go" "left" $DOUBLE "meters"
 }
 
 rule Right {
-	"go" "right" INT "meters"
+	"go" "right" $DOUBLE "meters"
 }
 
 

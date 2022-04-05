@@ -1,4 +1,6 @@
 
+// START OF FILE LexerTemplate.scala
+
 // package jucheparse
 
 object LexerTemplate {
@@ -24,7 +26,7 @@ case class STAR(r: Rexp) extends Rexp
 case class RANGE(s: Set[Char]) extends Rexp {
 	override def toString : String = {
 		val s_mod = s.map(c => s"\'${c}\'")
-		s"RANGE(${s_mod})"
+		s"RANGE(Set(${s_mod.mkString("", ",", "")}))"
 	}
 }
 case class PLUS(r: Rexp) extends Rexp
@@ -42,7 +44,7 @@ case class BOUND(r: Rexp, min: Int, max: Int) extends Rexp
 case class NOT(s: Set[Char]) extends Rexp {
 	override def toString : String = {
 		val s_mod = s.map(c => s"\'${c}\'")
-		s"NOT(${s_mod})"
+		s"NOT(Set(${s_mod.mkString("", ",", "")}))"
 	}
 }
 case class NOTSEQ(cl: List[Char]) extends Rexp {
@@ -442,3 +444,5 @@ def lex(r: Rexp, s: String) =
 def get : String = code
 
 }
+
+// END OF FILE LexerTemplate.scala

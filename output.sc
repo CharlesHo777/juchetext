@@ -1,4 +1,8 @@
 
+//package dprk
+
+
+
 // package jucheparse
 
 // regular expressions including records
@@ -430,3 +434,103 @@ def lex(r: Rexp, s: String) =
 	env(lex_simp(r, s.toList))
 
 // END OF FILE Tokenizer.scala
+
+
+
+object dprkTokenizer {
+
+val LETTER = RANGE((('a' to 'z') ++ ('A' to 'Z')).toSet)
+
+val NUMBER = RANGE('0' to '9')
+
+val WHITESPACE = PLUS(" " | "\n" | "\t" | "\r")
+
+val SYMBOL = (
+	LETTER | NUMBER |
+	RANGE(Set('+', '-', '*', '/', '%', '=', '>', '<', '.', '_', ',', ';', ':', '!', '?', '|', '&', '~','$', '#', '^', '`', '@', '(', ')', '{', '}', '[', ']', ' ')) |
+	(CHAR('\\') ~ RANGE(Set('\\', '\"', '\'', 'n', 't', 'r')))
+)
+
+val INT = (OPT(CHAR('-')) ~ (CHAR('0') | (RANGE('1' to '9') ~ NUMBER.%)))
+val DOUBLE = (INT ~ CHAR('.') ~ (PLUS(NUMBER)))
+
+
+val Regger = SEQ(CHAR('a'),SEQ(STAR(CHAR('a')),SEQ(STAR(CHAR('b')),SEQ(ALT(CHAR('a'),ALT(CHAR('b'),CHAR('c'))),ALT(BOUND(RANGE(Set('b','a','c','d','e')),1,2),CHARSEQ(List('a', 'b', 'b', 'c', 'c', 'd')))))))
+
+
+val LANGUAGE_REG = {
+	STAR(
+		("key" $ "good morning" | "good day" | "good afternoon" | "good evening" | "good night" | "bonsoir" | "go back to sleep you little retard" | "nighty night!" | "say" | "out" | "go" | "forward" | "meters" | "backward" | "left" | "right") |
+		("sym" $ RANGE(Set[Char]())) | 
+("int" $ INT)|
+("db" $ DOUBLE)|
+ (("Regger" $ Regger))|
+
+		("ws" $ WHITESPACE) 
+	)
+}
+
+abstract class Token
+
+case class T_KEY(s: String) extends Token
+case class T_SYM(c: Char) extends Token
+case class T_ID(s: String) extends Token
+case class T_INT(n: Int) extends Token
+case class T_DB(d: Double) extends Token
+case class T_STR(s: String) extends Token
+case class T_CHAR(c: Char) extends Token
+
+case class T_Regger(s: String) extends Token
+
+def process_string(s: List[Char]) : List[Char] = s match {
+case '\\' :: '\\' :: cs => '\\' :: process_string(cs)
+case '\\' :: '\"' :: cs => '\"' :: process_string(cs)
+case '\\' :: '\'' :: cs => '\'' :: process_string(cs)
+case '\\' :: 'n' :: cs => '\n' :: process_string(cs)
+case '\\' :: 't' :: cs => '\t' :: process_string(cs)
+case '\\' :: 'r' :: cs => '\r' :: process_string(cs)
+case c :: cs => c :: process_string(cs)
+case Nil => Nil
+}
+
+
+val token : PartialFunction[(String, String), Token] = {
+	case ("key", s) => T_KEY(s)
+	case ("sym", s) =>
+		try {T_SYM(s.head)}
+		catch {case e: Exception => T_SYM('?')}
+	case ("id", s) => T_ID(s)
+	case ("int", s) =>
+		try {T_INT(s.toInt)}
+		catch {case e: Exception => T_INT(0)}
+	case ("db", s) =>
+		try {T_DB(s.toDouble)}
+		catch {case e: Exception => T_DB(0.0)}
+	case ("str", s) =>
+		try {
+			val s2 = s.init.tail
+			val s3 = process_string(s2.toList).mkString
+			T_STR(s3)
+		} catch {
+			case e: Exception => T_STR("")
+		}
+	case ("char", s) =>
+		try {
+			val s2 = s.init.tail
+			val c = process_string(s2.toList).head
+			T_CHAR(c)
+		} catch {
+			case e: Exception => T_CHAR('?')
+		}
+	case ("Regger", s) => T_Regger(s)
+}
+
+def tokenize(s: String) : List[Token] = {
+	lex(LANGUAGE_REG, s).collect(token)
+}
+
+}
+
+		
+
+
