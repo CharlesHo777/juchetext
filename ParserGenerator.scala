@@ -32,15 +32,9 @@ def build_terminal_parsers(ls: List[Grammar.Stmt]) : String = {
 		|		else Set()
 		|	}
 		|}
-		"""
+		""".stripMargin
 	)
 	parser_list.mkString("", "", "")
-}
-
-def have_assigns(el: List[Grammar.Exp]) : Boolean = el match {
-	case Assign :: es => true
-	case _ :: es => have_assigns(es)
-	case Nil => false
 }
 
 def create_node(id: String) : String = {
@@ -48,9 +42,10 @@ def create_node(id: String) : String = {
 }
 
 def create_nodes(ls: List[Grammar.Stmt]) : String = ls match {
-	case Rule(id, _) :: sx => create_node(id) ++ create_nodes(sx)
-	case Program(id, _) :: sx => create_node(id) ++ create_nodes(sx)
-	case Enumerate(id, _) :: sx => s"case class ${id}Node(k: String) extends Node\n" ++ create_nodes(sx)
+	case Grammar.Rule(id, _) :: sx => create_node(id) ++ create_nodes(sx)
+	case Grammar.Program(id, _) :: sx => create_node(id) ++ create_nodes(sx)
+	case Grammar.Enumerate(id, _) :: sx => s"case class ${id}Node(k: String) extends Node\n" ++ create_nodes(sx)
+	case _ :: sx => create_nodes(sx)
 	case Nil => ""
 }
 
@@ -89,18 +84,14 @@ def build_seq_parser(el: List[Grammar.Exp]) : String = {
 		"NothingParser"
 }
 
-case class Assign(e: Exp) extends Exp
-case class CardiExp(e: Exp, c: Cardi) extends Exp
-case class SeqExp(es: List[Exp]) extends Exp
-
 def parse_results(el: List[Grammar.Exp], i: Int = 1) : List[String] = el match {
-	case Assign :: es => s"n${i}" :: parse_results(es, i + 1)
+	case Grammar.Assign(_) :: es => s"n${i}" :: parse_results(es, i + 1)
 	case _ :: es => "_" :: parse_results(es, i)
 	case Nil => Nil
 }
 
 def print_parse_results(el: List[Grammar.Exp]) : (String, Int) = {
-	val res = el.parse_results(el)
+	val res = parse_results(el)
 	val n = res.count(r => r != "_")
 	if (! res.isEmpty)
 		(res.mkString("", " ~ ", ""), n)
@@ -114,26 +105,26 @@ def node_list(count: Int) : String = {
 }
 
 def build_parser(e: Grammar.Exp) : String = e match {
-	case Keyword(s) => s"KWP(\"${s}\")"
-	case CallRule(r) => s"${r}Parser"
-	case Assign(e) => build_parser(e)
-	case TypeExp(t) => build_type_parser(t)
-	case CardiExp(e, c) => build_cardi_parser(e, c)
-	case AltExp(e1, e2) => s"(${build_alt_parser(e1, e2)})"
-	case SeqExp(es) => {
+	case Grammar.Keyword(s) => s"KWP(\"${s}\")"
+	case Grammar.CallRule(r) => s"${r}Parser"
+	case Grammar.Assign(e) => build_parser(e)
+	case Grammar.TypeExp(t) => build_type_parser(t)
+	case Grammar.CardiExp(e, c) => build_cardi_parser(e, c)
+	case Grammar.AltExp(e1, e2) => s"${build_alt_parser(e1, e2)}"
+	case Grammar.SeqExp(es) => {
 		val (res, n) = print_parse_results(es)
 		val node = {
 			if (n <= 0) "EmptyNode"
 			else if (n == 1) "n1"
 			else s"SeqNode(List(${node_list(n)}))"
 		}
-		s"(${build_seq_parser(es)}.map{case ${res} => ${node}})"
+		s"(${build_seq_parser(es)}).map{case ${res} => ${node}}"
 	}
 	case _ => ""
 }
 
 def build_parser_sequence(el: List[Grammar.Exp]) : String = {
-	val parser_list = el.map(build_parser)
+	val parser_list = el.map(e => s"(${build_parser(e)})")
 	
 	if (parser_list.size > 1)
 		parser_list.mkString("(", " ~ ", ")")
@@ -153,12 +144,12 @@ def list_elems(el: List[Grammar.Elem]) : String = {
 }
 
 def build_stmt_parser(s: Grammar.Stmt) : String = {
-	if (s.isInstanceOf[Grammar.Rule] {
+	if (s.isInstanceOf[Grammar.Rule]) {
 		val r = s.asInstanceOf[Grammar.Rule]
 		val el = r.exps
 		val exps_seq = {
 			if (! el.isEmpty)
-				el.map(build_parser).mkString("", "~", "")
+				el.map(build_parser).mkString("(", " ~ ", ")")
 			else
 				"NothingParser"
 		}
@@ -173,7 +164,7 @@ def build_stmt_parser(s: Grammar.Stmt) : String = {
 	}
 	else if (s.isInstanceOf[Grammar.Program]) {
 		val p = s.asInstanceOf[Grammar.Program]
-		build_stmt_parser(Grammar.Terminal(p.id, p.exps))
+		build_stmt_parser(Grammar.Rule(p.id, p.exps))
 	}
 	else if (s.isInstanceOf[Grammar.Enumerate]) {
 		val en = s.asInstanceOf[Grammar.Enumerate]
@@ -184,26 +175,25 @@ def build_stmt_parser(s: Grammar.Stmt) : String = {
 		|		case s => ${en.id}Node(s)
 		|	}
 		|}
-		"""
+		""".stripMargin
 	}
 	else ""
 }
 
-def create_nodes(ls: List[Grammar.Stmt]) : String = ls match {
-	case Grammar.Program(id, es) :: sx => create_node(id, es) ++ create_nodes(sx)
-	case Grammar.Rule(id, es) :: sx => create_node(id, es) ++ create_nodes(sx)
-	case _ :: sx => create_nodes(sx)
-	case Nil => ""
-}
+def generate(source: String) : String = {
 
-def generate(ls: List[Grammar.Stmt]) : String = {
+val ls = Grammar.parse(source)
 
 val title = ls match {
 	case t :: sx if (t.isInstanceOf[Grammar.Title]) => t.asInstanceOf[Grammar.Title].p
 	case _ => "not_named"
 }
 
-val template = ParserGenerator.get
+val template = ParserTemplate.get
+
+val program_rule = ls.find(s => s.isInstanceOf[Grammar.Program]).getOrElse(Grammar.Program("null", Nil))
+
+val program_name = program_rule.asInstanceOf[Grammar.Program].id
 
 s"""
 
@@ -212,14 +202,6 @@ package ${title}
 object ${title}Parser {
 
 ${template}
-
-case class TKP(t: Token) extends Parser[List[Token], Node] {
-	def parse(in: List[Token]) = {
-		if (in == Nil) Set()
-		else if (in.head == t) Set((TokenNode(t), in.tail))
-		else Set()
-	}
-}
 
 case class KWP(k: String) extends Parser[List[Token], Node] {
 	def parse(tl: List[Token]) = {
@@ -342,6 +324,15 @@ case class C_STAR extends Cardi // zero or more times
 ${create_nodes(ls)}
 
 ${ls.map(build_stmt_parser).mkString("", "", "")}
+
+def parse(s: String) : Node = {
+	val tks = ${title}Tokenizer.tokenize(s)
+	try {
+		${program_name}Parser.parse_all(tks).head
+	} catch {
+		case e: Exception => ${program_name}Node(Nil)
+	}
+}
 
 }
 
