@@ -19,14 +19,19 @@ def select_non_fragments(ls: List[Grammar.Terminal]) : List[Grammar.Terminal] = 
 }
 
 def build_terminal_parsers(ls: List[Grammar.Stmt]) : String = {
+	val title = ls match {
+		case t :: sx if (t.isInstanceOf[Grammar.Title]) => t.asInstanceOf[Grammar.Title].p
+		case _ => "not_named"
+	}
+
 	val non_fragments = select_non_fragments(stmts_to_terminals(ls))
 
 	val parser_list = non_fragments.map(t => t.id).map(
 		t_name => s"""
-		|case object ${t_name}Parser extends Parser[List[Token], String] {
+		|case object ${t_name}Parser extends Parser[List[Token], Node] {
 		|	def parse(tl: List[Token]) = {
 		|		if (tl != Nil) tl match {
-		|			case T_${t_name}(s) :: ts => Set((s, ts))
+		|			case ${title}Tokenizer.T_${t_name}(s) :: ts => Set((TerminalNode(s), ts))
 		|			case _ => Set()
 		|		}
 		|		else Set()
@@ -136,7 +141,7 @@ def build_parser_sequence(el: List[Grammar.Exp]) : String = {
 
 def list_elems(el: List[Grammar.Elem]) : String = {
 	if (! el.isEmpty) {
-		val elem_parsers = el.map(e => s"KWP(\"${e.s}\")")
+		val elem_parsers = el.map(e => s"ElemParser(\"${e.s}\")")
 		elem_parsers.mkString("", " || ", "")
 	}
 	else
@@ -206,8 +211,19 @@ ${template}
 case class KWP(k: String) extends Parser[List[Token], Node] {
 	def parse(tl: List[Token]) = {
 		if (tl != Nil) tl match {
-			case ${title}Tokenizer.T_KEY(s) :: ts if (k == s) Set((KeyNode(k), ts))
-			case ${title}Tokenizer.T_SYM(s) :: ts if (k == s) Set((KeyNode(k), ts))
+			case ${title}Tokenizer.T_KEY(s) :: ts if (k == s) => Set((KeyNode(k), ts))
+			case ${title}Tokenizer.T_SYM(c) :: ts if (k == c.toString) => Set((KeyNode(k), ts))
+			case _ => Set()
+		}
+		else Set()
+	}
+}
+
+case class ElemParser(k: String) extends Parser[List[Token], String] {
+	def parse(tl: List[Token]) = {
+		if (tl != Nil) tl match {
+			case ${title}Tokenizer.T_KEY(s) :: ts if (k == s) => Set((k, ts))
+			case ${title}Tokenizer.T_SYM(c) :: ts if (k == c.toString) => Set((k, ts))
 			case _ => Set()
 		}
 		else Set()
@@ -268,34 +284,34 @@ case class CardiParser(p: Parser[List[Token], Node], c: Cardi) extends Parser[Li
 		case C_OPT => {
 			(NothingParser || p).map{
 				case n => OptionNode(n)
-			}.parse(tl)
+			}.parse(tl).asInstanceOf[Set[(Node, List[Token])]]
 		}
 		case C_PLUS => {
-			(p ~ CardiParser(p, Grammar.C_STAR)).map[Node]{
+			(p ~ CardiParser(p, C_STAR)).map[Node]{
 				case n1 ~ n2 => {
 					if (n2.isInstanceOf[CardiNode])
 						CardiNode(n1 :: n2.asInstanceOf[CardiNode].ns)
 					else
 						CardiNode(List[Node](n1))
 				}
-			}.parse(tl)
+			}.parse(tl).asInstanceOf[Set[(Node, List[Token])]]
 		}
 		case C_STAR => {
-			(NothingParser || (p ~ CardiParser(p, Grammar.C_STAR)).map[Node]{
+			(NothingParser || (p ~ CardiParser(p, C_STAR)).map[Node]{
 				case n1 ~ n2 => {
 					if (n2.isInstanceOf[CardiNode])
 						CardiNode(n1 :: n2.asInstanceOf[CardiNode].ns)
 					else
 						CardiNode(List[Node](n1))
 				}
-			})
+			}).parse(tl).asInstanceOf[Set[(Node, List[Token])]]
 		}
 	}
 }
 
 case object NothingParser extends Parser[List[Token], Node] {
 	def parse(tl: List[Token]) = {
-		Set((OptionNode(None), tl))
+		Set((EmptyNode, tl))
 	}
 }
 
@@ -308,6 +324,7 @@ case class KeyNode(k: String) extends Node
 case class OptionNode(n: Node) extends Node
 case class CardiNode(ns: List[Node]) extends Node
 case object EmptyNode extends Node
+case class TerminalNode(s: String) extends Node
 
 case class IdNode(s: String) extends Node
 case class IntNode(n: Int) extends Node
@@ -319,7 +336,7 @@ abstract class Cardi // cardinality of an expression
 
 case object C_OPT extends Cardi // optional
 case object C_PLUS extends Cardi // one or more times
-case class C_STAR extends Cardi // zero or more times
+case object C_STAR extends Cardi // zero or more times
 
 ${create_nodes(ls)}
 

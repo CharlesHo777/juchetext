@@ -228,9 +228,9 @@ case object C_STAR extends Cardi
 case object CardiParser extends Parser[List[Token], Cardi] {
 	def parse(tl: List[Token]) = {
 		if (tl != Nil) tl match {
-			case T_OP('*') :: ts => Set((C_OPT, ts))
+			case T_OP('*') :: ts => Set((C_STAR, ts))
 			case T_OP('+') :: ts => Set((C_PLUS, ts))
-			case T_OP('?') :: ts => Set((C_STAR, ts))
+			case T_OP('?') :: ts => Set((C_OPT, ts))
 			case _ => Set()
 		}
 		else Set()

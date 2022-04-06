@@ -258,7 +258,6 @@ object LexerGenerator {
 		|
 		|${define_lang}
 		|
-		|abstract class Token
 		|
 		|case class T_KEY(s: String) extends Token
 		|case class T_SYM(c: Char) extends Token
