@@ -88,7 +88,7 @@ object LexerGenerator {
 	def build_types(sl: List[String]) : String = sl match {
 		case Nil => ""
 		case "ID" :: xs => {
-			"""val IDENTIFIER = (LETTER ~ STAR(CHAR('_') | LETTER | |NUMBER))
+			"""val ID = (LETTER ~ STAR(CHAR('_') | LETTER | NUMBER))
 			|""".stripMargin ++ build_types(xs)
 		}
 		case "INT" :: xs => {
@@ -145,7 +145,7 @@ object LexerGenerator {
 
 		val kwds_chars = kwds.filter(k => k.size == 1)
 
-		val kwds_words_reg = s"""("key" $$ ${build_alt_keys(kwds)})"""
+		val kwds_words_reg = s"""("key" $$ (${build_alt_keys(kwds_words)}))"""
 
 		def print_chars(sc: List[String]) : String = sc match {
 			case Nil => ""

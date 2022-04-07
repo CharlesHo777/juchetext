@@ -82,9 +82,9 @@ def build_alt_parser(e1: Grammar.Exp, e2: Grammar.Exp) : String = {
 	s"${build_parser(e1)} || ${build_parser(e2)}"
 }
 
-def build_seq_parser(el: List[Grammar.Exp]) : String = {
+def build_seq_parser(el: List[Grammar.Exp]) : String = {	
 	if (! el.isEmpty)
-		el.map(build_parser).mkString("", " ~ ", "")
+		el.map(e => s"(${build_parser(e)})").mkString("", " ~ ", "")
 	else
 		"NothingParser"
 }

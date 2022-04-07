@@ -1,0 +1,49 @@
+grammar Turtles
+
+program TurtleProgram {
+	$(Statement)*
+}
+
+rule Statement {
+	$(Move | Turn | Loop | VariableDeclaration)
+}
+
+rule VariableDeclaration {
+	"var" $ID "=" INT
+}
+
+rule Loop {
+	$Addition "times" "do"
+		$(Statement)+
+	"end"
+}
+
+rule Move {
+	$MoveCommand "(" $Addition ")"
+}
+
+enumerate MoveCommand {
+	"forward" | "backward"
+}
+
+rule Turn {
+	"turn" $TurnCommand "by" $DOUBLE "degrees"
+}
+
+enumerate TurnCommand {
+	"left" | "right"
+}
+
+rule Addition {
+	$Multiplication $( $( "+" | "-" ) $Multiplication )*
+}
+
+rule Multiplication {
+	$Primary $( $( "*" | "/" ) $Primary )*
+}
+
+rule Primary {
+	$(
+		INT | ID | ( "(" $Addition ")" )
+	)
+}

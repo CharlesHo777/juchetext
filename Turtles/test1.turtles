@@ -1,0 +1,9 @@
+
+2*5 times do
+	var stepCount = 10
+	forward (stepCount)
+	5-4 times do
+		backward (stepCount)
+	end
+	turn right by 20.0 degrees
+end
