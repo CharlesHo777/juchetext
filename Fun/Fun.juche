@@ -1,0 +1,77 @@
+
+grammar Fun
+
+program FunProgram {
+	$(Declaration)*
+}
+
+rule Declaration {
+	Function | Main | Const | FConst
+}
+
+rule Function {
+	"def" $ID $Arguments ":" $ReturnType "="
+		$Exp ";"
+}
+
+rule Const {
+	"val" $ID ":" "Int" "=" INT ";"
+}
+
+rule FConst {
+	"val" $ID ":" "Double" "=" DOUBLE ";"
+}
+
+rule Main {
+	$Exp
+}
+
+rule Arguments {
+	"(" $ID ":" $("Int" | "Double") $("," $ID ":" $ReturnType)* ")"
+}
+
+enumerate ReturnType {
+	"Int" | "Double" | "Void"
+}
+
+rule Exp {
+	AtomicExp | ("{" $Sequence "}")
+}
+
+rule AtomicExp {
+	Call | If | ID | INT | DOUBLE | CHAR | Aop
+}
+
+rule Sequence {
+	$AtomicExp $(";" $AtomicExp)*
+}
+
+rule Call {
+	$ID "(" $( $AtomicExp $("," $AtomicExp)* )?  ")"
+}
+
+rule If {
+	"if" $BExp "then" $Exp "else" $Exp
+}
+
+rule BExp {
+	$AtomicExp $BOP $AtomicExp
+}
+
+terminal BOP {
+	"(==)|(>)|(<)|(>=)|(<=)|(!=)"
+}
+
+rule Aop {
+	$AtomicExp $OP $AtomicExp
+}
+
+terminal OP {
+	"\+|\-|\*|/|%"
+}
+
+@ignore terminal COMMENT {
+	"(//)(${SYMBOL})*\n"
+}
+
+

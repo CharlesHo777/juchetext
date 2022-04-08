@@ -151,7 +151,11 @@ def list_elems(el: List[Grammar.Elem]) : String = {
 def build_stmt_parser(s: Grammar.Stmt) : String = {
 	if (s.isInstanceOf[Grammar.Rule]) {
 		val r = s.asInstanceOf[Grammar.Rule]
-		val el = r.exps
+		val el = r.exps match {
+			case e :: Nil if (e.isInstanceOf[Grammar.AltExp]) =>
+				List[Grammar.Exp](Grammar.Assign(e))
+			case l => l
+		}
 		val exps_seq = {
 			if (! el.isEmpty)
 				el.map(build_parser).mkString("(", " ~ ", ")")

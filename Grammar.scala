@@ -324,7 +324,9 @@ lazy val AltDef: Parser[List[Token], Exp] = {
 	(Exp ~ OpParser('|') ~ AltDef).map[Exp]{
 		case e ~ _ ~ al => AltExp(e, al)
 	} ||
-	Exp
+	(Exp ~ OpParser('|') ~ Exp).map[Exp]{
+		case e1 ~ _ ~ e2 => AltExp(e1, e2)
+	}
 }
 
 lazy val Enum: Parser[List[Token], List[Elem]] = {
