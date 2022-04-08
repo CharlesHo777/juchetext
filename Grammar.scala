@@ -76,6 +76,17 @@ def process_string(s: List[Char]) : List[Char] = s match {
 	case Nil => Nil
 }
 
+def revert_string(s: List[Char]) : List[Char] = s match {
+	case '\\' :: cs => '\\' :: '\\' :: revert_string(cs)
+	case '\"' :: cs => '\\' :: '\"' :: revert_string(cs)
+	case '\'' :: cs => '\\' :: '\'' :: revert_string(cs)
+	case '\n' :: cs => '\\' :: 'n' :: revert_string(cs)
+	case '\t' :: cs => '\\' :: 't' :: revert_string(cs)
+	case '\r' :: cs => '\\' :: 'r' :: revert_string(cs)
+	case c :: cs => c :: revert_string(cs)
+	case Nil => Nil
+}
+
 val token : PartialFunction[(String, String), Token] = {
 	case ("key", s) => T_KEY(s)
 	case ("id", s) => T_ID(s)
@@ -342,11 +353,14 @@ lazy val ElemParser: Parser[List[Token], Elem] = {
 
 lazy val Pattern: Parser[List[Token], Rexp] = {
 	(StrParser).map[Rexp]{
-		s => 	try {RegexParser.parse(s)}
-					catch {case e: Exception =>
-						println("Error when parsing pattern in a terminal rule")
-						ZERO
-					}
+		s => {
+			val cx = revert_string(s.toList)
+			try {RegexParser.parse(cx.mkString)}
+			catch {case e: Exception =>
+			println("Error when parsing pattern in a terminal rule")
+			ZERO
+			}
+		}
 	}
 }
 

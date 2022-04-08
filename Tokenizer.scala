@@ -4,16 +4,36 @@
 // regular expressions including records
 abstract class Rexp
 
-case object ZERO extends Rexp
-case object ONE extends Rexp
+case object ZERO extends Rexp {
+	override def toString : String = {
+		"ZERO"
+	}
+}
+case object ONE extends Rexp {
+	override def toString : String = {
+		"ONE"
+	}
+}
 case class CHAR(c: Char) extends Rexp {
 	override def toString : String = {
 		s"CHAR(\'${c}\')"
 	}
 }
-case class ALT(r1: Rexp, r2: Rexp) extends Rexp
-case class SEQ(r1: Rexp, r2: Rexp) extends Rexp
-case class STAR(r: Rexp) extends Rexp
+case class ALT(r1: Rexp, r2: Rexp) extends Rexp {
+	override def toString : String = {
+		s"ALT(${r1}, ${r2})"
+	}
+}
+case class SEQ(r1: Rexp, r2: Rexp) extends Rexp {
+	override def toString : String = {
+		s"SEQ(${r1}, ${r2})"
+	}
+}
+case class STAR(r: Rexp) extends Rexp {
+	override def toString : String = {
+		s"STAR(${r})"
+	}
+}
 
 case class RANGE(s: Set[Char]) extends Rexp {
 	override def toString : String = {
@@ -21,9 +41,21 @@ case class RANGE(s: Set[Char]) extends Rexp {
 		s"RANGE(Set(${s_mod.mkString("", ",", "")}))"
 	}
 }
-case class PLUS(r: Rexp) extends Rexp
-case class OPT(r: Rexp) extends Rexp
-case class NTIMES(r: Rexp, n: Int) extends Rexp
+case class PLUS(r: Rexp) extends Rexp {
+	override def toString : String = {
+		s"PLUS(${r})"
+	}
+}
+case class OPT(r: Rexp) extends Rexp {
+	override def toString : String = {
+		s"OPT(${r})"
+	}
+}
+case class NTIMES(r: Rexp, n: Int) extends Rexp {
+	override def toString : String = {
+		s"NTIMES(${r}, ${n})"
+	}
+}
 
 case class CHARSEQ(cl: List[Char]) extends Rexp {
 	override def toString : String = {
@@ -31,8 +63,16 @@ case class CHARSEQ(cl: List[Char]) extends Rexp {
 		s"CHARSEQ(${cl_mod})"
 	}
 }
-case object ANY extends Rexp
-case class BOUND(r: Rexp, min: Int, max: Int) extends Rexp
+case object ANY extends Rexp {
+	override def toString : String = {
+		"ANY"
+	}
+}
+case class BOUND(r: Rexp, min: Int, max: Int) extends Rexp {
+	override def toString : String = {
+		s"BOUND(${r}, ${min}, ${max})"
+	}
+}
 case class NOT(s: Set[Char]) extends Rexp {
 	override def toString : String = {
 		val s_mod = s.map(c => s"\'${c}\'")

@@ -27,7 +27,7 @@ rule Main {
 }
 
 rule Arguments {
-	"(" $ID ":" $("Int" | "Double") $("," $ID ":" $ReturnType)* ")"
+	"(" $ID ":" $("Int" | "Double") $( "," $ID ":" $("Int" | "Double") )* ")"
 }
 
 enumerate ReturnType {
@@ -51,7 +51,7 @@ rule Call {
 }
 
 rule If {
-	"if" $BExp "then" $Exp "else" $Exp
+	"if" $(BExp | ("(" $BExp ")")) "then" $Exp "else" $Exp
 }
 
 rule BExp {
@@ -63,15 +63,19 @@ terminal BOP {
 }
 
 rule Aop {
-	$AtomicExp $OP $AtomicExp
+	$Multiplication $($("+" | "-") $Multiplication)
 }
 
-terminal OP {
-	"\+|\-|\*|/|%"
+rule Multiplication {
+	$Primary $($("*" | "/" | "%") $Primary)*
+}
+
+rule Primary {
+	INT | DOUBLE | Call | ID | CHAR | ("(" $Aop ")")
 }
 
 @ignore terminal COMMENT {
-	"(//)(${SYMBOL})*\n"
+	"(//)({$SYMBOL})*(\n)"
 }
 
 

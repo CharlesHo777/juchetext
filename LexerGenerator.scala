@@ -176,6 +176,8 @@ object LexerGenerator {
 
 		val hiddens = ls.filter(s => s.isInstanceOf[Grammar.Hidden]).map[Grammar.Hidden](s => s.asInstanceOf[Grammar.Hidden])
 
+		val hidden_regs = hiddens.map(h => s"val ${h.id} = ${h.pat}").mkString("\n")
+
 		val hidden_recds_list = hiddens.map(h => s"""("${h.id}" $$ ${h.pat})""")
 
 		val hidden_recds = {
@@ -255,6 +257,8 @@ object LexerGenerator {
 		|${types_def}
 		|
 		|${terminals_def}
+		|
+		|${hidden_regs}
 		|
 		|${define_lang}
 		|

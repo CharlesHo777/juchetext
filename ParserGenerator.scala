@@ -158,7 +158,7 @@ def build_stmt_parser(s: Grammar.Stmt) : String = {
 		}
 		val exps_seq = {
 			if (! el.isEmpty)
-				el.map(build_parser).mkString("(", " ~ ", ")")
+				el.map(e => s"(${build_parser(e)})").mkString("(", " ~ ", ")")
 			else
 				"NothingParser"
 		}
@@ -206,7 +206,7 @@ val program_name = program_rule.asInstanceOf[Grammar.Program].id
 
 s"""
 
-package ${title}
+// package ${title}
 
 object ${title}Parser {
 
