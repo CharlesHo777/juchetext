@@ -75,7 +75,7 @@ rule Primary {
 }
 
 @ignore terminal COMMENT {
-	"(//)({$SYMBOL})*(\n)"
+	" (//) ( {$SYMBOL} | "\"" | "\'" | "\\" )* (\n) "
 }
 
 

@@ -1,4 +1,6 @@
 
+// START OF FILE ParserTemplate.scala
+
 // package jucheparse
 
 object ParserTemplate {
@@ -90,3 +92,5 @@ case class TKP(t: Token) extends Parser[List[Token], Token] {
 def get : String = code
 
 }
+
+// END OF FILE ParserTemplate.scala

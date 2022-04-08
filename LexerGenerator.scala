@@ -75,6 +75,9 @@ object LexerGenerator {
 		case Nil => Nil
 		case Grammar.TypeExp(t) :: es => t :: find_types_in_exps(es)
 		case Grammar.Assign(e) :: es => find_types_in_exps(List[Grammar.Exp](e)) ::: find_types_in_exps(es)
+		case Grammar.AltExp(e1, e2) :: es => find_types_in_exps(List[Grammar.Exp](e1, e2)) ::: find_types_in_exps(es)
+		case Grammar.CardiExp(e, cd) :: es => find_types_in_exps(List[Grammar.Exp](e)) ::: find_types_in_exps(es)
+		case Grammar.SeqExp(ex) :: es => find_types_in_exps(ex) ::: find_types_in_exps(es)
 		case e :: es => find_types_in_exps(es)
 	}
 	
@@ -131,9 +134,9 @@ object LexerGenerator {
 			case _ => "not_named"
 		}
 
-		val types = find_types_in_stmts(ls)
+		val types = find_types_in_stmts(ls).distinct
 
-		val types_def = build_types(types.distinct)
+		val types_def = build_types(types)
 
 		val terminals = stmts_to_terminals(ls)
 
@@ -258,7 +261,7 @@ object LexerGenerator {
 		|
 		|${terminals_def}
 		|
-		|${hidden_regs}
+		|
 		|
 		|${define_lang}
 		|

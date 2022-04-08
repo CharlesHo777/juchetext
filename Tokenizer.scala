@@ -4,6 +4,16 @@
 // regular expressions including records
 abstract class Rexp
 
+def revert_char(c: Char) : String = s match {
+	case '\\' => "\\\\"
+	case '\"' => "\\\""
+	case '\'' => "\\\'"
+	case '\n' => "\\n"
+	case '\t' => "\\t"
+	case '\r' => "\\r"
+	case c => c
+}
+
 case object ZERO extends Rexp {
 	override def toString : String = {
 		"ZERO"
@@ -16,7 +26,7 @@ case object ONE extends Rexp {
 }
 case class CHAR(c: Char) extends Rexp {
 	override def toString : String = {
-		s"CHAR(\'${c}\')"
+		s"CHAR(\'${revert_char(c)}\')"
 	}
 }
 case class ALT(r1: Rexp, r2: Rexp) extends Rexp {
@@ -37,7 +47,7 @@ case class STAR(r: Rexp) extends Rexp {
 
 case class RANGE(s: Set[Char]) extends Rexp {
 	override def toString : String = {
-		val s_mod = s.map(c => s"\'${c}\'")
+		val s_mod = s.map(c => s"\'${revert_char(c)}\'")
 		s"RANGE(Set(${s_mod.mkString("", ",", "")}))"
 	}
 }
@@ -59,7 +69,7 @@ case class NTIMES(r: Rexp, n: Int) extends Rexp {
 
 case class CHARSEQ(cl: List[Char]) extends Rexp {
 	override def toString : String = {
-		val cl_mod = cl.map(c => s"\'${c}\'")
+		val cl_mod = cl.map(c => s"\'${revert_char(c)}\'")
 		s"CHARSEQ(${cl_mod})"
 	}
 }
@@ -75,13 +85,13 @@ case class BOUND(r: Rexp, min: Int, max: Int) extends Rexp {
 }
 case class NOT(s: Set[Char]) extends Rexp {
 	override def toString : String = {
-		val s_mod = s.map(c => s"\'${c}\'")
+		val s_mod = s.map(c => s"\'${revert_char(c)}\'")
 		s"NOT(Set(${s_mod.mkString("", ",", "")}))"
 	}
 }
 case class NOTSEQ(cl: List[Char]) extends Rexp {
 	override def toString : String = {
-		val cl_mod = cl.map(c => s"\'${c}\'")
+		val cl_mod = cl.map(c => s"\'${revert_char(c)}\'")
 		s"NOTSEQ(${cl_mod})"
 	}
 }
