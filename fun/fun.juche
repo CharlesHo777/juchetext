@@ -63,7 +63,7 @@ terminal BOP {
 }
 
 rule Aop {
-	$Multiplication $($("+" | "-") $Multiplication)
+	$Multiplication $($("+" | "-") $Multiplication)*
 }
 
 rule Multiplication {
@@ -75,7 +75,7 @@ rule Primary {
 }
 
 @ignore terminal COMMENT {
-	" (//) ( {$SYMBOL} | "\"" | "\'" | "\\" )* (\n) "
+	" (//) ( {$SYMBOL} | \" | \' | \\ )* (\n) "
 }
 
 

@@ -91,23 +91,23 @@ object LexerGenerator {
 	def build_types(sl: List[String]) : String = sl match {
 		case Nil => ""
 		case "ID" :: xs => {
-			"""val ID = (LETTER ~ STAR(CHAR('_') | LETTER | NUMBER))
+			"""val ID = (LETTER69420 ~ STAR(CHAR('_') | LETTER69420 | NUMBER69420))
 			|""".stripMargin ++ build_types(xs)
 		}
 		case "INT" :: xs => {
-			"""val INT = (OPT(CHAR('-')) ~ (CHAR('0') | (RANGE('1' to '9') ~ NUMBER.%)))
+			"""val INT = (OPT(CHAR('-')) ~ (CHAR('0') | (RANGE('1' to '9') ~ NUMBER69420.%)))
 			|""".stripMargin ++ build_types(xs)
 		}
 		case "DOUBLE" :: xs => {
-			"""val DOUBLE = (INT ~ CHAR('.') ~ (PLUS(NUMBER)))
+			"""val DOUBLE = (INT ~ CHAR('.') ~ (PLUS(NUMBER69420)))
 			|""".stripMargin ++ build_types(xs)
 		}
 		case "STRING" :: xs => {
-			"""val STRING = (CHAR('\"') ~ STAR(SYMBOL | '\'') ~ CHAR('\"'))
+			"""val STRING = (CHAR('\"') ~ STAR(SYMBOL69420 | '\'') ~ CHAR('\"'))
 			|""".stripMargin ++ build_types(xs)
 		}
 		case "CHAR" :: xs => {
-			"""val CHARACTER = (CHAR('\'') ~ (SYMBOL | '\"') ~ CHAR('\''))
+			"""val CHARACTER = (CHAR('\'') ~ (SYMBOL69420 | '\"') ~ CHAR('\''))
 			|""".stripMargin ++ build_types(xs)
 		}
 		case _ :: xs => ""
@@ -193,7 +193,7 @@ object LexerGenerator {
 			|	STAR(
 			|		${kwds_words_reg} |
 			|		${kwds_chars_reg} | ${types_recds} ${terminal_recds}
-			|		("ws" $$ WHITESPACE) ${hidden_recds}
+			|		("ws" $$ WHITESPACE69420) ${hidden_recds}
 			|	)
 			|}"""
 		}
@@ -245,16 +245,21 @@ object LexerGenerator {
 		|
 		|object ${title}Tokenizer {
 		|
-		|val LETTER = RANGE((('a' to 'z') ++ ('A' to 'Z')).toSet)
+		|val LETTER69420 = RANGE((('a' to 'z') ++ ('A' to 'Z')).toSet)
 		|
-		|val NUMBER = RANGE('0' to '9')
+		|val NUMBER69420 = RANGE('0' to '9')
 		|
-		|val WHITESPACE = PLUS(" " | "\\n" | "\\t" | "\\r")
+		|val WHITESPACE69420 = PLUS(" " | "\\n" | "\\t" | "\\r")
 		|
-		|val SYMBOL = (
-		|	LETTER | NUMBER |
+		|val SYMBOL69420 = (
+		|	LETTER69420 | NUMBER69420 |
 		|	RANGE(Set('+', '-', '*', '/', '%', '=', '>', '<', '.', '_', ',', ';', ':', '!', '?', '|', '&', '~','$$', '#', '^', '`', '@', '(', ')', '{', '}', '[', ']', ' ')) |
 		|	(CHAR('\\\\') ~ RANGE(Set('\\\\', '\\"', '\\'', 'n', 't', 'r')))
+		|)
+		|
+		|val SYMBOL = (
+		|	LETTER69420 | NUMBER69420 |
+		|	RANGE(Set('+', '-', '*', '/', '%', '=', '>', '<', '.', '_', ',', ';', ':', '!', '?', '|', '&', '~','$$', '#', '^', '`', '@', '(', ')', '{', '}', '[', ']', ' ', '\\\\', '\\"', '\\''))
 		|)
 		|
 		|${types_def}

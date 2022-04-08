@@ -182,7 +182,7 @@ lazy val Cluster: Parser[List[Token], Rexp] = {
 	BracBlock || MinMaxBlock ||
 	(BracParser('(') ~ Reg ~ BracParser(')')).map[Rexp]{
 		case _ ~ r ~ _ => r
-	} ||
+	} || Reference ||
 	(CharParser).map[Rexp]{ c => CHAR(c) }
 }
 

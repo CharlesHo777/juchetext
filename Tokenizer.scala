@@ -4,14 +4,14 @@
 // regular expressions including records
 abstract class Rexp
 
-def revert_char(c: Char) : String = s match {
+def revert_char(c: Char) : String = c match {
 	case '\\' => "\\\\"
 	case '\"' => "\\\""
 	case '\'' => "\\\'"
 	case '\n' => "\\n"
 	case '\t' => "\\t"
 	case '\r' => "\\r"
-	case c => c
+	case c => c.toString
 }
 
 case object ZERO extends Rexp {
